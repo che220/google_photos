@@ -5,7 +5,7 @@ import numpy as np
 import requests
 import cv2
 import datetime as dt
-from photos import service
+from Google import Create_Service
 
 pd.set_option('display.width', 5000)
 pd.set_option('display.max_rows', 5000)
@@ -13,7 +13,21 @@ pd.set_option('display.max_rows', 5000)
 pd.set_option('max_columns', 600)
 pd.set_option('display.float_format', lambda x: '%.2f' % x)  # disable scientific notation for print
 
+logging.basicConfig(format='%(asctime)s [%(name)s:%(lineno)d] [%(levelname)s] %(message)s',
+                    level=logging.INFO)
 logger = logging.getLogger(os.path.dirname(__file__))
+
+
+def init_service(secret_dir):
+    # look for client id JSON file and token file in work dir
+    API_NAME = "photoslibrary"
+    API_VERSION = "v1"
+    CLIENT_SECRET_FILE = os.path.join(secret_dir, 'client_secret_photos.json')
+    SCOPES = ['https://www.googleapis.com/auth/photoslibrary', 'https://www.googleapis.com/auth/photoslibrary.sharing']
+
+    service = Create_Service(CLIENT_SECRET_FILE, API_NAME, API_VERSION, SCOPES)
+    # print(dir(service))
+    return service
 
 
 def show_img(img):
@@ -50,9 +64,7 @@ def download_img(url):
 def get_outfile(google_filename, created):
     pos = google_filename.rfind('.')
     outfile = google_filename + '.jpg' if pos < 0 else google_filename[0:pos] + '.jpg'
-    outdir = os.path.join('photos', f'{created.year}-{created.month:02d}')
-    os.makedirs(outdir, exist_ok=True)
-    outfile = os.path.join(outdir, outfile)
+    outfile = os.path.join(f'{created.year}-{created.month:02d}', outfile)
     return outfile
 
 
@@ -83,7 +95,10 @@ def download_photo_list():
 
 
 if __name__ == '__main__':
-    list_file = os.path.join('photos', 'photo_list.csv')
+    photo_dir = os.path.join(os.environ['HOME'], 'Desktop/private/photos')
+    service = init_service(photo_dir)
+
+    list_file = os.path.join(photo_dir, 'photo_list.csv')
     if not os.path.exists(list_file):
         df = download_photo_list()
         df.to_csv(list_file, header=True, index=False)
@@ -95,9 +110,13 @@ if __name__ == '__main__':
     id = df.id.iloc[0]
     url, created = get_item_info(id)
     outfile = get_outfile(df.filename.iloc[0], created)
+    outfile = os.path.join(photo_dir, outfile)
+
     if os.path.exists(outfile):
         logger.info('skip %s', outfile)
     else:
+        os.makedirs(os.path.dirname(outfile), exist_ok=True)
+
         print(f'get {id} ...')
         img = download_img(url)
         save_item(img, outfile, created)

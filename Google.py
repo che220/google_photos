@@ -14,7 +14,8 @@ def Create_Service(client_secret_file, api_name, api_version, *scopes):
  
     cred = None
  
-    pickle_file = f'token_{API_SERVICE_NAME}_{API_VERSION}.pickle'
+    secret_dir = os.path.dirname(client_secret_file)
+    pickle_file = os.path.join(secret_dir, f'token_{API_SERVICE_NAME}_{API_VERSION}.pickle')
     # print(pickle_file)
  
     if os.path.exists(pickle_file):
