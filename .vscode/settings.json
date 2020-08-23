@@ -1,11 +1,10 @@
 {
-    "python.pythonPath": "/home/hui/venvs/venv_w2/bin/python",
     "folders": [
         {
             "path": ".."
         }
     ],
     "settings": {
-        "python.pythonPath": "/home/hui/venvs/venv_w2/bin/python3"
+        "python.pythonPath": "${env:HOME}/venvs/venv_w2/bin/python3"
     }
 }
