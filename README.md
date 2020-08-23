@@ -19,3 +19,9 @@ https://console.cloud.google.com/:
 
 5. Copied Google.py from https://learndataanalysis.org/getting-started-with-google-photos-api-and-python-part-1/
 
+### Albums
+
+Reference here:
+
+    https://developers.google.com/photos/library/reference/rest
+
