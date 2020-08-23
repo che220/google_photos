@@ -8,6 +8,7 @@ import cv2
 import datetime as dt
 import json
 from concurrent.futures import ProcessPoolExecutor
+import multiprocessing
 
 from Google import Create_Service
 
@@ -171,5 +172,31 @@ if __name__ == '__main__':
         logger.info('load list from %s', list_file)
         df = pd.read_csv(list_file)
 
-    for i, row in df.iterrows():
-        download_item(service, row)
+    def get_creation_time(x):
+        meta = x.replace("'", '"')  # json demands double-quote
+        meta = json.loads(meta)
+        return meta['creationTime']
+
+    df['creationTime'] = df.mediaMetadata.map(lambda x: get_creation_time(x))
+
+    def get_file_extension(x):
+        pos = x.rfind('.')
+        return None if pos < 0 else x[pos:].lower()
+
+    df['file_type'] = df.filename.map(lambda x: get_file_extension(x))
+    logger.info('File Types:\n%s', df.file_type.value_counts(dropna=False))
+
+    # do not download video files yet!
+    video_types = ['.mov', '.avi', '.mp4']
+    df = df[~pd.isnull(df.file_type)]
+    df = df[~df.file_type.isin(video_types)].copy()
+    logger.info('Remaining File Types:\n%s', df.file_type.value_counts(dropna=False))
+
+    df = df.sort_values('creationTime', ascending=False)
+    if True:
+        for i, row in df.iterrows():
+            download_item(service, row)
+    else:
+        with ProcessPoolExecutor() as executor:
+            for i, row in df.iterrows():
+                executor.submit(download_item, service, row)
