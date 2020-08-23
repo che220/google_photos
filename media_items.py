@@ -106,7 +106,7 @@ def download_photo_list():
 
     
 if __name__ == '__main__':
-    photo_dir = os.path.join(os.environ['HOME'], 'Desktop/private/photos')
+    photo_dir = os.path.join(os.environ['HOME'], 'Desktop/private/photos')  # Mac
     if host.startswith('LINUX'):
         photo_dir = os.path.join(os.environ['HOME'], 'TB/tmp/hw_photos')
     service = init_service(photo_dir)
@@ -122,7 +122,7 @@ if __name__ == '__main__':
 
     for i, row in df.iterrows():
         id = row.id
-        meta = row.mediaMetadata.replace("'", '"')
+        meta = row.mediaMetadata.replace("'", '"')  # json demands double-quote
         meta = json.loads(meta)
         created = dt.datetime.strptime(meta['creationTime'], "%Y-%m-%dT%H:%M:%SZ")
 
@@ -135,6 +135,6 @@ if __name__ == '__main__':
             os.makedirs(os.path.dirname(outfile), exist_ok=True)
 
             logger.debug(f'get {id} ...')
-            url, created = get_item_info(id)
+            url, created = get_item_info(id)  # somehow info has to be downloaded before image can be downloaded
             img = download_img(url)
             save_item(img, outfile, created)
