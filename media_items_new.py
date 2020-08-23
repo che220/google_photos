@@ -44,17 +44,19 @@ def show_img(img):
     cv2.waitKey(0)
 
 
+def get_item_url_and_created(meta):
+    created = dt.datetime.strptime(meta['creationTime'], "%Y-%m-%dT%H:%M:%SZ")
+    w = meta['width']
+    h = meta['height']
+    url = row.baseUrl
+    url = f'{url}=w{w}-h{h}'
+    return url, created
+
+
 def get_item_info(id):
     resp = service.mediaItems().get(mediaItemId=id).execute()
     meta = resp['mediaMetadata']
-    created = dt.datetime.strptime(meta['creationTime'], "%Y-%m-%dT%H:%M:%SZ")
-
-    w = meta['width']
-    h = meta['height']
-
-    url = resp['baseUrl']
-    url = f'{url}=w{w}-h{h}'
-    return url, created
+    return get_item_url_and_created(meta)
 
 
 def download_img(url):
@@ -124,8 +126,8 @@ if __name__ == '__main__':
         id = row.id
         meta = row.mediaMetadata.replace("'", '"')
         meta = json.loads(meta)
-        created = dt.datetime.strptime(meta['creationTime'], "%Y-%m-%dT%H:%M:%SZ")
-
+        saved_url, created = get_item_url_and_created(meta)
+    
         outfile = get_outfile(row.filename, created)
         outfile = os.path.join(photo_dir, outfile)
 
@@ -134,7 +136,11 @@ if __name__ == '__main__':
         else:
             os.makedirs(os.path.dirname(outfile), exist_ok=True)
 
-            logger.debug(f'get {id} ...')
             url, created = get_item_info(id)
+            if url != saved_url:
+                logger.error('URL is different')
+            logger.debug(f'get {id} ...')
             img = download_img(url)
             save_item(img, outfile, created)
+
+i = 0
