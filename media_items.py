@@ -1,4 +1,5 @@
 import os
+import platform
 import logging
 import pandas as pd
 import numpy as np
@@ -16,6 +17,7 @@ pd.set_option('display.float_format', lambda x: '%.2f' % x)  # disable scientifi
 logging.basicConfig(format='%(asctime)s [%(name)s:%(lineno)d] [%(levelname)s] %(message)s',
                     level=logging.INFO)
 logger = logging.getLogger(os.path.dirname(__file__))
+host = platform.platform().upper()
 
 
 def init_service(secret_dir):
@@ -70,9 +72,17 @@ def get_outfile(google_filename, created):
 
 def save_item(img, outfile, created):
     cv2.imwrite(outfile, img)
-    created = created.strftime('%m/%d/%Y %H:%M:%S')
-    os.system(f'SetFile -d "{created}" {outfile}')
-    os.system(f'SetFile -m "{created}" {outfile}')
+    if host.startswith('DARWIN'):
+        logger.debug('It is Mac')
+        created = created.strftime('%m/%d/%Y %H:%M:%S')
+        os.system(f'SetFile -d "{created}" {outfile}')
+        os.system(f'SetFile -m "{created}" {outfile}')
+    elif host.startswith('LINUX'):
+        logger.debug('It is Linux')
+        created = created.strftime('%Y%m%d%H%M')
+        os.system(f'touch -a -m -t {created} {outfile}')
+    else:
+        raise RuntimeError('Cannot handle OS type: '+host)
     logger.info('saved into %s', outfile)
 
 
@@ -96,6 +106,8 @@ def download_photo_list():
 
 if __name__ == '__main__':
     photo_dir = os.path.join(os.environ['HOME'], 'Desktop/private/photos')
+    if host.startswith('LINUX'):
+        photo_dir = os.path.join(os.environ['HOME'], 'TB/tmp/hw_photos')
     service = init_service(photo_dir)
 
     list_file = os.path.join(photo_dir, 'photo_list.csv')
@@ -107,16 +119,17 @@ if __name__ == '__main__':
         logger.info('load list from %s', list_file)
         df = pd.read_csv(list_file)
 
-    id = df.id.iloc[0]
-    url, created = get_item_info(id)
-    outfile = get_outfile(df.filename.iloc[0], created)
-    outfile = os.path.join(photo_dir, outfile)
+    for i, row in df.iterrows():
+        id = row.id
+        url, created = get_item_info(id)
+        outfile = get_outfile(row.filename, created)
+        outfile = os.path.join(photo_dir, outfile)
 
-    if os.path.exists(outfile):
-        logger.info('skip %s', outfile)
-    else:
-        os.makedirs(os.path.dirname(outfile), exist_ok=True)
+        if os.path.exists(outfile):
+            logger.info('skip %s', outfile)
+        else:
+            os.makedirs(os.path.dirname(outfile), exist_ok=True)
 
-        print(f'get {id} ...')
-        img = download_img(url)
-        save_item(img, outfile, created)
+            logger.info(f'get {id} ...')
+            img = download_img(url)
+            save_item(img, outfile, created)
