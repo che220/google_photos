@@ -5,7 +5,7 @@
         }
     ],
     "settings": {
-        "python.pythonPath": "${env:HOME}/venvs/venv_w2/bin/python3"
+        "python.pythonPath": "/home/hui/venvs/venv_w2/bin/python3"
     },
-    "python.pythonPath": "${env:HOME}/venvs/venv_w2/bin/python"
+    "python.pythonPath": "/home/hui/venvs/venv_w2/bin/python"
 }

@@ -39,12 +39,12 @@ def show_img(img):
     w = img.shape[1]//f
     h = img.shape[0]//f
     logger.info('resize to %s x %s', w, h)
-    img = cv2.resize(img, (w, h))
-    cv2.imshow("Image", img)
-    cv2.waitKey(0)
+    img = cv2.resize(img, (w, h))  # pylint: disable=no-member
+    cv2.imshow("Image", img)  # pylint: disable=no-member
+    cv2.waitKey(0)  # pylint: disable=no-member
 
 
-def get_item_info(id):
+def get_item_info(service, id):
     resp = service.mediaItems().get(mediaItemId=id).execute()
     meta = resp['mediaMetadata']
     created = dt.datetime.strptime(meta['creationTime'], "%Y-%m-%dT%H:%M:%SZ")
@@ -60,7 +60,7 @@ def get_item_info(id):
 def download_img(url):
     resp = requests.get(url)
     img = np.asarray(bytearray(resp.content), dtype="uint8")
-    img = cv2.imdecode(img, cv2.IMREAD_UNCHANGED)
+    img = cv2.imdecode(img, cv2.IMREAD_UNCHANGED)  # pylint: disable=no-member
     return img
 
 
@@ -72,7 +72,7 @@ def get_outfile(google_filename, created):
 
 
 def save_item(img, outfile, created):
-    cv2.imwrite(outfile, img)
+    cv2.imwrite(outfile, img)  # pylint: disable=no-member
     if host.startswith('DARWIN'):
         logger.debug('It is Mac')
         created = created.strftime('%m/%d/%Y %H:%M:%S')
@@ -87,7 +87,7 @@ def save_item(img, outfile, created):
     logger.info('saved into %s', outfile)
 
 
-def download_photo_list():
+def download_photo_list(service):
     page_size = 100
     resp = service.mediaItems().list(pageSize=page_size).execute()
     items = resp.get('mediaItems')
@@ -134,7 +134,7 @@ if __name__ == '__main__':
 
     list_file = os.path.join(photo_dir, 'photo_list.csv')
     if not os.path.exists(list_file):
-        df = download_photo_list()
+        df = download_photo_list(service)
         df.to_csv(list_file, header=True, index=False)
         logger.info('saved list file: %s', list_file)
     else:
@@ -160,6 +160,10 @@ if __name__ == '__main__':
         os.makedirs(os.path.dirname(outfile), exist_ok=True)
 
         logger.debug(f'get {id} ...')
-        url, created = get_item_info(id)  # somehow info has to be downloaded before image can be downloaded
+        url, created = get_item_info(service, id)  # somehow info has to be downloaded before image can be downloaded
         img = download_img(url)
-        save_item(img, outfile, created)
+        try:
+            save_item(img, outfile, created)
+        except:
+            import traceback
+            traceback.print_exc()
