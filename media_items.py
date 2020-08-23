@@ -104,6 +104,27 @@ def download_photo_list():
     df = pd.DataFrame(items)
     return df
 
+
+def get_unique_filename(outfile, created):
+    """
+    if outfile exists and timestamp diff more than one day, get a new name
+    """
+    idx = 0
+    while 1:
+        if not os.path.exists(outfile):
+            return outfile
+        
+        mtime = os.path.getmtime(outfile)
+        mtime = dt.datetime.fromtimestamp(mtime)
+        gap = (created - mtime).total_seconds()
+        if gap < 86400:
+            logger.info('skip %s', outfile)
+            return None
+
+        pos = outfile.rfind('.')
+        outfile = outfile[0:pos] + f"_{idx}" + ".jpg"
+        idx += 1
+
     
 if __name__ == '__main__':
     photo_dir = os.path.join(os.environ['HOME'], 'Desktop/private/photos')  # Mac
@@ -128,13 +149,17 @@ if __name__ == '__main__':
 
         outfile = get_outfile(row.filename, created)
         outfile = os.path.join(photo_dir, outfile)
+        orig_outfile = outfile
+        outfile = get_unique_filename(outfile, created)
+        if outfile is None:
+            continue
 
-        if os.path.exists(outfile):
-            logger.info('skip %s', outfile)
-        else:
-            os.makedirs(os.path.dirname(outfile), exist_ok=True)
+        if outfile != orig_outfile:
+            logger.info('filename changed: %s', outfile)
+            
+        os.makedirs(os.path.dirname(outfile), exist_ok=True)
 
-            logger.debug(f'get {id} ...')
-            url, created = get_item_info(id)  # somehow info has to be downloaded before image can be downloaded
-            img = download_img(url)
-            save_item(img, outfile, created)
+        logger.debug(f'get {id} ...')
+        url, created = get_item_info(id)  # somehow info has to be downloaded before image can be downloaded
+        img = download_img(url)
+        save_item(img, outfile, created)
