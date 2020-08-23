@@ -104,7 +104,7 @@ def download_photo_list():
     df = pd.DataFrame(items)
     return df
 
-
+    
 if __name__ == '__main__':
     photo_dir = os.path.join(os.environ['HOME'], 'Desktop/private/photos')
     if host.startswith('LINUX'):
