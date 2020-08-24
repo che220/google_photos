@@ -28,7 +28,7 @@ def init_service(secret_dir):
     # look for client id JSON file and token file in work dir
     API_NAME = "photoslibrary"
     API_VERSION = "v1"
-    CLIENT_SECRET_FILE = os.path.join(secret_dir, 'client_secret_photos.json')
+    CLIENT_SECRET_FILE = os.path.join(secret_dir, 'client_secret_photos_21.json')
     SCOPES = ['https://www.googleapis.com/auth/photoslibrary', 'https://www.googleapis.com/auth/photoslibrary.sharing']
 
     service = Create_Service(CLIENT_SECRET_FILE, API_NAME, API_VERSION, SCOPES)
@@ -67,13 +67,6 @@ def download_img(url):
     return img
 
 
-def get_outfile(google_filename, created):
-    pos = google_filename.rfind('.')
-    outfile = google_filename + '.jpg' if pos < 0 else google_filename[0:pos] + '.jpg'
-    outfile = os.path.join(f'{created.year}-{created.month:02d}', outfile)
-    return outfile
-
-
 def save_item(img, outfile, created):
     cv2.imwrite(outfile, img)  # pylint: disable=no-member
     if host.startswith('DARWIN'):
@@ -108,43 +101,40 @@ def download_photo_list(service):
     return df
 
 
-def get_unique_filename(outfile, created):
+def filter_outfiles(outfiles, creation_times):
     """
     if outfile exists and timestamp diff more than one day, get a new name
     """
-    idx = 0
-    while 1:
-        if not os.path.exists(outfile):
-            return outfile
-        
-        mtime = os.path.getmtime(outfile)
-        mtime = dt.datetime.fromtimestamp(mtime)
-        gap = (created - mtime).total_seconds()
-        if gap < 86400:
-            logger.info('skip %s', outfile)
-            return None
+    new_outfiles = []
+    for i in range(outfiles.shape[0]):
+        outfile = outfiles[i]
+        created = dt.datetime.strptime(creation_times[i], "%Y-%m-%dT%H:%M:%SZ")
 
-        pos = outfile.rfind('.')
-        outfile = outfile[0:pos] + f"_{idx}" + ".jpg"
-        idx += 1
+        idx = 0
+        while 1:
+            if not os.path.exists(outfile):
+                break
+            
+            mtime = os.path.getmtime(outfile)
+            mtime = dt.datetime.fromtimestamp(mtime)
+            gap = (created - mtime).total_seconds()
+            if gap < 86400:
+                logger.info('skip %s', outfile)
+                outfile = None
+                break
+
+            pos = outfile.rfind('.')
+            outfile = outfile[0:pos] + f"_{idx}" + ".jpg"
+            idx += 1
+        
+        new_outfiles.append(outfile)
+
+    return new_outfiles
 
 
 def download_item(service, row):
     id = row.id
-    meta = row.mediaMetadata.replace("'", '"')  # json demands double-quote
-    meta = json.loads(meta)
-    created = dt.datetime.strptime(meta['creationTime'], "%Y-%m-%dT%H:%M:%SZ")
-
-    outfile = get_outfile(row.filename, created)
-    outfile = os.path.join(photo_dir, outfile)
-    orig_outfile = outfile
-    outfile = get_unique_filename(outfile, created)
-    if outfile is None:
-        return
-
-    if outfile != orig_outfile:
-        logger.info('filename changed: %s', outfile)
-        
+    outfile = row.outfile
     os.makedirs(os.path.dirname(outfile), exist_ok=True)
 
     logger.debug(f'get {id} ...')
@@ -155,6 +145,22 @@ def download_item(service, row):
     except:
         import traceback
         traceback.print_exc()
+
+
+def get_creation_time(metadata):
+    meta = metadata.replace("'", '"')  # json demands double-quote
+    meta = json.loads(meta)
+    return meta['creationTime']
+
+
+def get_file_extension(google_filename):
+    pos = google_filename.rfind('.')
+    return None if pos < 0 else google_filename[pos:].lower()
+
+
+def get_out_filename(google_filename):
+    pos = google_filename.rfind('.')
+    return google_filename[0:pos] + '.jpg'
 
     
 if __name__ == '__main__':
@@ -172,18 +178,8 @@ if __name__ == '__main__':
         logger.info('load list from %s', list_file)
         df = pd.read_csv(list_file)
 
-    def get_creation_time(x):
-        meta = x.replace("'", '"')  # json demands double-quote
-        meta = json.loads(meta)
-        return meta['creationTime']
-
-    df['creationTime'] = df.mediaMetadata.map(lambda x: get_creation_time(x))
-
-    def get_file_extension(x):
-        pos = x.rfind('.')
-        return None if pos < 0 else x[pos:].lower()
-
-    df['file_type'] = df.filename.map(lambda x: get_file_extension(x))
+    df['creationTime'] = df.mediaMetadata.map(get_creation_time)
+    df['file_type'] = df.filename.map(get_file_extension)
     logger.info('File Types:\n%s', df.file_type.value_counts(dropna=False))
 
     # do not download video files yet!
@@ -192,8 +188,18 @@ if __name__ == '__main__':
     df = df[~df.file_type.isin(video_types)].copy()
     logger.info('Remaining File Types:\n%s', df.file_type.value_counts(dropna=False))
 
+    df['month'] = df.creationTime.map(lambda x: os.path.join(photo_dir, '-'.join(x.split('-')[0:2])))
+    df['outfile'] = df.filename.map(get_out_filename)
+    df.outfile = df.month+"/"+df.outfile
+
+    outfiles = df.outfile.values
+    creation_times = df.creationTime.values
+    df['outfile'] = filter_outfiles(outfiles, creation_times)
+    df = df[~pd.isnull(df.outfile)].copy()
+    logger.info('%s photos to be downloaded', df.shape[0])
+
     df = df.sort_values('creationTime', ascending=False)
-    if True:
+    if False:
         for i, row in df.iterrows():
             download_item(service, row)
     else:
