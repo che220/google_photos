@@ -26,6 +26,7 @@ logging.basicConfig(format='%(asctime)s [%(name)s:%(lineno)d] [%(levelname)s] %(
 logger = logging.getLogger(os.path.dirname(__file__))
 host = platform.platform().upper()
 
+# TODO: remove files without extension in the YYYY-MM directories
 
 def init_service(secret_dir):
     # look for client id JSON file and token file in work dir
