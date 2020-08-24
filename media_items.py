@@ -7,6 +7,9 @@ import requests
 import cv2
 import datetime as dt
 import json
+from concurrent.futures import ProcessPoolExecutor
+import multiprocessing
+
 from Google import Create_Service
 
 pd.set_option('display.width', 5000)
@@ -64,13 +67,6 @@ def download_img(url):
     return img
 
 
-def get_outfile(google_filename, created):
-    pos = google_filename.rfind('.')
-    outfile = google_filename + '.jpg' if pos < 0 else google_filename[0:pos] + '.jpg'
-    outfile = os.path.join(f'{created.year}-{created.month:02d}', outfile)
-    return outfile
-
-
 def save_item(img, outfile, created):
     cv2.imwrite(outfile, img)  # pylint: disable=no-member
     if host.startswith('DARWIN'):
@@ -105,25 +101,66 @@ def download_photo_list(service):
     return df
 
 
-def get_unique_filename(outfile, created):
+def filter_outfiles(outfiles, creation_times):
     """
     if outfile exists and timestamp diff more than one day, get a new name
     """
-    idx = 0
-    while 1:
-        if not os.path.exists(outfile):
-            return outfile
-        
-        mtime = os.path.getmtime(outfile)
-        mtime = dt.datetime.fromtimestamp(mtime)
-        gap = (created - mtime).total_seconds()
-        if gap < 86400:
-            logger.info('skip %s', outfile)
-            return None
+    new_outfiles = []
+    for i in range(outfiles.shape[0]):
+        outfile = outfiles[i]
+        created = dt.datetime.strptime(creation_times[i], "%Y-%m-%dT%H:%M:%SZ")
 
-        pos = outfile.rfind('.')
-        outfile = outfile[0:pos] + f"_{idx}" + ".jpg"
-        idx += 1
+        idx = 0
+        while 1:
+            if not os.path.exists(outfile):
+                break
+            
+            mtime = os.path.getmtime(outfile)
+            mtime = dt.datetime.fromtimestamp(mtime)
+            gap = (created - mtime).total_seconds()
+            if gap < 86400:
+                logger.debug('skip %s', outfile)
+                outfile = None
+                break
+
+            pos = outfile.rfind('.')
+            outfile = outfile[0:pos] + f"_{idx}" + ".jpg"
+            idx += 1
+        
+        new_outfiles.append(outfile)
+
+    return new_outfiles
+
+
+def download_item(service, row):
+    id = row.id
+    outfile = row.outfile
+    os.makedirs(os.path.dirname(outfile), exist_ok=True)
+
+    try:
+        logger.debug(f'get {id} ...')
+        url, created = get_item_info(service, id)  # somehow info has to be downloaded before image can be downloaded
+        img = download_img(url)
+        save_item(img, outfile, created)
+    except:
+        import traceback
+        traceback.print_exc()
+
+
+def get_creation_time(metadata):
+    meta = metadata.replace("'", '"')  # json demands double-quote
+    meta = json.loads(meta)
+    return meta['creationTime']
+
+
+def get_file_extension(google_filename):
+    pos = google_filename.rfind('.')
+    return None if pos < 0 else google_filename[pos:].lower()
+
+
+def get_out_filename(google_filename):
+    pos = google_filename.rfind('.')
+    return google_filename[0:pos] + '.jpg'
 
     
 if __name__ == '__main__':
@@ -141,29 +178,34 @@ if __name__ == '__main__':
         logger.info('load list from %s', list_file)
         df = pd.read_csv(list_file)
 
-    for i, row in df.iterrows():
-        id = row.id
-        meta = row.mediaMetadata.replace("'", '"')  # json demands double-quote
-        meta = json.loads(meta)
-        created = dt.datetime.strptime(meta['creationTime'], "%Y-%m-%dT%H:%M:%SZ")
+    df['creationTime'] = df.mediaMetadata.map(get_creation_time)
+    df['file_type'] = df.filename.map(get_file_extension)
+    logger.info('File Types:\n%s', df.file_type.value_counts(dropna=False))
 
-        outfile = get_outfile(row.filename, created)
-        outfile = os.path.join(photo_dir, outfile)
-        orig_outfile = outfile
-        outfile = get_unique_filename(outfile, created)
-        if outfile is None:
-            continue
+    # do not download video files yet!
+    video_types = ['.mov', '.avi', '.mp4']
+    df = df[~pd.isnull(df.file_type)]
+    df = df[~df.file_type.isin(video_types)].copy()
+    logger.info('Remaining File Types:\n%s', df.file_type.value_counts(dropna=False))
 
-        if outfile != orig_outfile:
-            logger.info('filename changed: %s', outfile)
-            
-        os.makedirs(os.path.dirname(outfile), exist_ok=True)
+    df['month'] = df.creationTime.map(lambda x: os.path.join(photo_dir, '-'.join(x.split('-')[0:2])))
+    df['outfile'] = df.filename.map(get_out_filename)
+    df.outfile = df.month+"/"+df.outfile
 
-        logger.debug(f'get {id} ...')
-        url, created = get_item_info(service, id)  # somehow info has to be downloaded before image can be downloaded
-        img = download_img(url)
-        try:
-            save_item(img, outfile, created)
-        except:
-            import traceback
-            traceback.print_exc()
+    outfiles = df.outfile.values
+    creation_times = df.creationTime.values
+    df['outfile'] = filter_outfiles(outfiles, creation_times)
+    df = df[~pd.isnull(df.outfile)].copy()
+    logger.info('%s photos to be downloaded', df.shape[0])
+
+    df = df.sort_values('creationTime', ascending=False)
+    logger.info('head:\n%s', df.head(1))
+    logger.info('tail:\n%s', df.tail(1))
+
+    if False:
+        for i, row in df.iterrows():
+            download_item(service, row)
+    else:
+        with ProcessPoolExecutor(max_workers=4) as executor:
+            for i, row in df.iterrows():
+                executor.submit(download_item, service, row)
