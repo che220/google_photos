@@ -13,6 +13,7 @@ from concurrent.futures import ProcessPoolExecutor
 import multiprocessing
 
 from Google import Create_Service
+from googleapiclient.errors import HttpError
 
 pd.set_option('display.width', 5000)
 pd.set_option('display.max_rows', 5000)
@@ -129,10 +130,11 @@ def download_item(service, row):
         img = download_img(url)
         save_item(img, outfile, created, row.filename)
         return None
-    except cv2.error:
-        logger.error('Error downloading %s', id)
+    except HttpError:
+        logger.error('Quota rejected downloading %s', id)
+        import traceback
         traceback.print_exc()
-        return id
+        return "exit"
     except:
         logger.error('Error downloading %s', id)
         import traceback
@@ -198,17 +200,32 @@ if __name__ == '__main__':
     df = df[~pd.isnull(df.outfile)].copy()
     logger.info('%s photos to be downloaded', df.shape[0])
 
+    bad_id_file = os.path.join(photo_dir, 'bad_ids.json')
+    if os.path.exists(bad_id_file):
+        with open(bad_id_file, 'r') as fin:
+            bad_ids = json.load(fin)
+    else:
+        bad_ids = []
+    df = df[~df.id.isin(bad_ids)].copy()
+    logger.info('%s photos to be downloaded after removing bad ids', df.shape[0])
+
     df = df.sort_values('creationTime', ascending=False)
     logger.info('head:\n%s', df.head(1))
     logger.info('tail:\n%s', df.tail(1))
     # exit(0)
 
     if True:
-        bad_ids = []
         for i, row in df.iterrows():
             id = download_item(service, row)
-            if id is not None:
-                bad_ids.append(id)
+            if id is None:
+                continue
+            if id == 'exit':
+                break
+
+            bad_ids.append(id)
+            with open(bad_id_file, 'w') as fout:
+                fout.write(json.dumps(bad_ids, indent=4))
+                logger.info('Bad ids are stored in %s', bad_id_file)
     else:
         with ProcessPoolExecutor(max_workers=4) as executor:
             for i, row in df.iterrows():
