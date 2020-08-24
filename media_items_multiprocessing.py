@@ -119,7 +119,7 @@ def filter_outfiles(outfiles, creation_times):
             mtime = dt.datetime.fromtimestamp(mtime)
             gap = (created - mtime).total_seconds()
             if gap < 86400:
-                logger.info('skip %s', outfile)
+                logger.debug('skip %s', outfile)
                 outfile = None
                 break
 
@@ -202,12 +202,10 @@ if __name__ == '__main__':
     logger.info('head:\n%s', df.head(1))
     logger.info('tail:\n%s', df.tail(1))
 
-    # TRY batchGet!
-    exit(0)
     if False:
         for i, row in df.iterrows():
             download_item(service, row)
     else:
-        with ProcessPoolExecutor() as executor:
+        with ProcessPoolExecutor(max_workers=4) as executor:
             for i, row in df.iterrows():
                 executor.submit(download_item, service, row)
