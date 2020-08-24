@@ -29,7 +29,8 @@ def init_service(secret_dir):
     API_NAME = "photoslibrary"
     API_VERSION = "v1"
     CLIENT_SECRET_FILE = os.path.join(secret_dir, 'client_secret_photos.json')
-    SCOPES = ['https://www.googleapis.com/auth/photoslibrary', 'https://www.googleapis.com/auth/photoslibrary.sharing']
+    # SCOPES = ['https://www.googleapis.com/auth/photoslibrary', 'https://www.googleapis.com/auth/photoslibrary.sharing']
+    SCOPES = ['https://www.googleapis.com/auth/photoslibrary']
 
     service = Create_Service(CLIENT_SECRET_FILE, API_NAME, API_VERSION, SCOPES)
     # print(dir(service))
@@ -67,7 +68,7 @@ def download_img(url):
     return img
 
 
-def save_item(img, outfile, created):
+def save_item(img, outfile, created, old_filename):
     cv2.imwrite(outfile, img)  # pylint: disable=no-member
     if host.startswith('DARWIN'):
         logger.debug('It is Mac')
@@ -80,7 +81,7 @@ def save_item(img, outfile, created):
         os.system(f'touch -a -m -t {created} {outfile}')
     else:
         raise RuntimeError('Cannot handle OS type: '+host)
-    logger.info('saved into %s', outfile)
+    logger.info('saved into %s (was %s)', outfile, old_filename)
 
 
 def download_photo_list(service):
@@ -141,7 +142,7 @@ def download_item(service, row):
         logger.debug(f'get {id} ...')
         url, created = get_item_info(service, id)  # somehow info has to be downloaded before image can be downloaded
         img = download_img(url)
-        save_item(img, outfile, created)
+        save_item(img, outfile, created, row.filename)
     except:
         import traceback
         traceback.print_exc()
@@ -172,12 +173,13 @@ if __name__ == '__main__':
     list_file = os.path.join(photo_dir, 'photo_list.csv')
     if not os.path.exists(list_file):
         df = download_photo_list(service)
+        df.mediaMetadata = df.mediaMetadata.map(str)
         df.to_csv(list_file, header=True, index=False)
         logger.info('saved list file: %s', list_file)
     else:
         logger.info('load list from %s', list_file)
         df = pd.read_csv(list_file)
-
+    
     df['creationTime'] = df.mediaMetadata.map(get_creation_time)
     df['file_type'] = df.filename.map(get_file_extension)
     logger.info('File Types:\n%s', df.file_type.value_counts(dropna=False))
@@ -201,6 +203,7 @@ if __name__ == '__main__':
     df = df.sort_values('creationTime', ascending=False)
     logger.info('head:\n%s', df.head(1))
     logger.info('tail:\n%s', df.tail(1))
+#    exit(0)
 
     if False:
         for i, row in df.iterrows():
