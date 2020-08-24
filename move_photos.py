@@ -3,7 +3,7 @@ import datetime as dt
 import shutil
 
 exts = set()
-media_types = ['.jpg', '.tif', '.png', '.gif', '.mov', '.mp4',  '.mpg', '.heic']
+media_types = ['.jpg', '.tif', '.png', '.gif', '.mov', '.mp4',  '.mpg', '.heic', 'webp']
 
 def get_photos(files, in_dir):
     for file in os.listdir(in_dir):
@@ -29,8 +29,8 @@ def get_photos(files, in_dir):
     return files
 
 
-from_dir = os.path.join(os.environ['HOME'], 'TB/photos')
-to_dir = os.path.join(os.environ['HOME'], 'TB/tmp/hw_photos')
+from_dir = os.path.join(os.environ['HOME'], 'TB/photos.0')
+to_dir = os.path.join(os.environ['HOME'], 'TB/photos')
 
 files = get_photos([], from_dir)
 print('Number of files:', len(files))

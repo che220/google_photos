@@ -166,7 +166,7 @@ def get_out_filename(google_filename):
 if __name__ == '__main__':
     photo_dir = os.path.join(os.environ['HOME'], 'Desktop/private/photos')  # Mac
     if host.startswith('LINUX'):
-        photo_dir = os.path.join(os.environ['HOME'], 'TB/tmp/hw_photos')
+        photo_dir = os.path.join(os.environ['HOME'], 'TB/photos')
     service = init_service(photo_dir)
 
     list_file = os.path.join(photo_dir, 'photo_list.csv')
