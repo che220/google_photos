@@ -1,4 +1,5 @@
 import os
+import traceback
 import platform
 import logging
 import pandas as pd
@@ -110,25 +111,8 @@ def filter_outfiles(outfiles, creation_times):
     new_outfiles = []
     for i in range(outfiles.shape[0]):
         outfile = outfiles[i]
-        created = dt.datetime.strptime(creation_times[i], "%Y-%m-%dT%H:%M:%SZ")
-
-        idx = 0
-        while 1:
-            if not os.path.exists(outfile):
-                break
-            
-            mtime = os.path.getmtime(outfile)
-            mtime = dt.datetime.fromtimestamp(mtime)
-            gap = (created - mtime).total_seconds()
-            if gap < 86400:
-                logger.debug('skip %s', outfile)
-                outfile = None
-                break
-
-            pos = outfile.rfind('.')
-            outfile = outfile[0:pos] + f"_{idx}" + ".jpg"
-            idx += 1
-        
+        if os.path.exists(outfile):
+            outfile = None
         new_outfiles.append(outfile)
 
     return new_outfiles
@@ -144,10 +128,16 @@ def download_item(service, row):
         url, created = get_item_info(service, id)  # somehow info has to be downloaded before image can be downloaded
         img = download_img(url)
         save_item(img, outfile, created, row.filename)
+        return None
+    except cv2.error:
+        logger.error('Error downloading %s', id)
+        traceback.print_exc()
+        return id
     except:
         logger.error('Error downloading %s', id)
         import traceback
         traceback.print_exc()
+        return id
 
 
 def get_creation_time(metadata):
@@ -195,12 +185,16 @@ if __name__ == '__main__':
     logger.info('Remaining File Types:\n%s', df.file_type.value_counts(dropna=False))
 
     df['month'] = df.creationTime.map(lambda x: os.path.join(photo_dir, '-'.join(x.split('-')[0:2])))
+
+    # filter based on original filenames
+    df['orig_outfile'] = df.month + '/' + df.filename
+    df['orig_outfile_new'] = filter_outfiles(df.orig_outfile.values, df.creationTime.values)
+    df = df[~pd.isnull(df.orig_outfile_new)].copy()
+
+    # filter based on .jpg filenames
     df['outfile'] = df.filename.map(get_out_filename)
     df.outfile = df.month+"/"+df.outfile
-
-    outfiles = df.outfile.values
-    creation_times = df.creationTime.values
-    df['outfile'] = filter_outfiles(outfiles, creation_times)
+    df['outfile'] = filter_outfiles(df.outfile.values, df.creationTime.values)
     df = df[~pd.isnull(df.outfile)].copy()
     logger.info('%s photos to be downloaded', df.shape[0])
 
@@ -209,9 +203,12 @@ if __name__ == '__main__':
     logger.info('tail:\n%s', df.tail(1))
     # exit(0)
 
-    if False:
+    if True:
+        bad_ids = []
         for i, row in df.iterrows():
-            download_item(service, row)
+            id = download_item(service, row)
+            if id is not None:
+                bad_ids.append(id)
     else:
         with ProcessPoolExecutor(max_workers=4) as executor:
             for i, row in df.iterrows():
