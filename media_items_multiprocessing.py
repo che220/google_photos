@@ -137,10 +137,10 @@ def download_item(service, row):
     outfile = row.outfile
     os.makedirs(os.path.dirname(outfile), exist_ok=True)
 
-    logger.debug(f'get {id} ...')
-    url, created = get_item_info(service, id)  # somehow info has to be downloaded before image can be downloaded
-    img = download_img(url)
     try:
+        logger.debug(f'get {id} ...')
+        url, created = get_item_info(service, id)  # somehow info has to be downloaded before image can be downloaded
+        img = download_img(url)
         save_item(img, outfile, created)
     except:
         import traceback
@@ -201,6 +201,9 @@ if __name__ == '__main__':
     df = df.sort_values('creationTime', ascending=False)
     logger.info('head:\n%s', df.head(1))
     logger.info('tail:\n%s', df.tail(1))
+
+    # TRY batchGet!
+    exit(0)
     if False:
         for i, row in df.iterrows():
             download_item(service, row)
