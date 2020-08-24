@@ -199,6 +199,8 @@ if __name__ == '__main__':
     logger.info('%s photos to be downloaded', df.shape[0])
 
     df = df.sort_values('creationTime', ascending=False)
+    logger.info('head:\n%s', df.head(1))
+    logger.info('tail:\n%s', df.tail(1))
     if False:
         for i, row in df.iterrows():
             download_item(service, row)
