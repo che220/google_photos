@@ -7,6 +7,7 @@ import requests
 import cv2
 import datetime as dt
 import json
+import re
 from concurrent.futures import ProcessPoolExecutor
 import multiprocessing
 
@@ -144,6 +145,7 @@ def download_item(service, row):
         img = download_img(url)
         save_item(img, outfile, created, row.filename)
     except:
+        logger.error('Error downloading %s', id)
         import traceback
         traceback.print_exc()
 
@@ -160,6 +162,7 @@ def get_file_extension(google_filename):
 
 
 def get_out_filename(google_filename):
+    google_filename = re.sub(r'\s+', '_', google_filename)
     pos = google_filename.rfind('.')
     return google_filename[0:pos] + '.jpg'
 
@@ -169,6 +172,7 @@ if __name__ == '__main__':
     if host.startswith('LINUX'):
         photo_dir = os.path.join(os.environ['HOME'], 'TB/photos')
     service = init_service(photo_dir)
+    # exit(0)
 
     list_file = os.path.join(photo_dir, 'photo_list.csv')
     if not os.path.exists(list_file):
@@ -203,7 +207,7 @@ if __name__ == '__main__':
     df = df.sort_values('creationTime', ascending=False)
     logger.info('head:\n%s', df.head(1))
     logger.info('tail:\n%s', df.tail(1))
-#    exit(0)
+    # exit(0)
 
     if False:
         for i, row in df.iterrows():
