@@ -28,7 +28,9 @@ def init_service(secret_dir):
     # look for client id JSON file and token file in work dir
     API_NAME = "photoslibrary"
     API_VERSION = "v1"
-    CLIENT_SECRET_FILE = os.path.join(secret_dir, 'client_secret_photos_21.json')
+    CLIENT_SECRET_FILE = os.path.join(secret_dir, 'client_secret_photos.json')
+    # CLIENT_SECRET_FILE = os.path.join(secret_dir, 'client_secret_photos_2.json')
+    # CLIENT_SECRET_FILE = os.path.join(secret_dir, 'client_secret_photos_21.json')
     SCOPES = ['https://www.googleapis.com/auth/photoslibrary', 'https://www.googleapis.com/auth/photoslibrary.sharing']
 
     service = Create_Service(CLIENT_SECRET_FILE, API_NAME, API_VERSION, SCOPES)
@@ -199,7 +201,7 @@ if __name__ == '__main__':
     logger.info('%s photos to be downloaded', df.shape[0])
 
     df = df.sort_values('creationTime', ascending=False)
-    if False:
+    if True:
         for i, row in df.iterrows():
             download_item(service, row)
     else:
