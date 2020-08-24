@@ -25,6 +25,7 @@ logging.basicConfig(format='%(asctime)s [%(name)s:%(lineno)d] [%(levelname)s] %(
                     level=logging.INFO)
 logger = logging.getLogger(os.path.dirname(__file__))
 host = platform.platform().upper()
+video_types = ['.mov', '.avi', '.mp4']
 
 # TODO: remove files without extension in the YYYY-MM directories
 
@@ -182,7 +183,6 @@ if __name__ == '__main__':
     logger.info('File Types:\n%s', df.file_type.value_counts(dropna=False))
 
     # do not download video files yet!
-    video_types = ['.mov', '.avi', '.mp4']
     df = df[~pd.isnull(df.file_type)]
     df = df[~df.file_type.isin(video_types)].copy()
     logger.info('Remaining File Types:\n%s', df.file_type.value_counts(dropna=False))
