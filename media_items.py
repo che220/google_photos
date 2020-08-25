@@ -98,7 +98,7 @@ def save_item(img, outfile, created, old_filename):
         os.system(f'touch -a -m -t {created} {outfile}')
     else:
         raise RuntimeError('Cannot handle OS type: '+host)
-    logger.info('saved into %s (was %s)', outfile, old_filename)
+    logger.info('saved into %s (was %s, created at %s)', outfile, old_filename, created)
 
 
 def download_photo_list(service):
