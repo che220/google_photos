@@ -29,7 +29,6 @@ logger = logging.getLogger(os.path.dirname(__file__))
 host = platform.platform().upper()
 #lock = threading.Lock()
 executor = ProcessPoolExecutor(max_workers=4)
-video_types = ['.mov', '.avi', '.mp4', '.wmv', '.mpg']
 
 # TODO: remove files without extension in the YYYY-MM directories
 
@@ -64,29 +63,25 @@ def show_img(img):
 
 
 def get_item_info(service, id):
-#    with lock:
+    # with lock:
     # google photos API is not thread-safe
     resp = service.mediaItems().get(mediaItemId=id).execute()
     meta = resp['mediaMetadata']
+    logger.debug('%s', meta)
     created = dt.datetime.strptime(meta['creationTime'], "%Y-%m-%dT%H:%M:%SZ")
 
-    w = meta['width']
-    h = meta['height']
-
     url = resp['baseUrl']
-    url = f'{url}=w{w}-h{h}'
+    if 'video' in meta:
+        url += "=dv"
+    else:
+        url += "=d"
     return url, created
 
 
-def download_img(session: requests.session, url):
-    resp = session.get(url)
-    img = np.asarray(bytearray(resp.content), dtype="uint8")
-    img = cv2.imdecode(img, cv2.IMREAD_UNCHANGED)  # pylint: disable=no-member
-    return img
+def save_item(content, outfile, created, old_filename):
+    with open(outfile, 'wb') as fout:
+        fout.write(content)
 
-
-def save_item(img, outfile, created, old_filename):
-    cv2.imwrite(outfile, img)  # pylint: disable=no-member
     if host.startswith('DARWIN'):
         logger.debug('It is Mac')
         created = created.strftime('%m/%d/%Y %H:%M:%S')
@@ -142,8 +137,8 @@ def download_item(service, row):
         logger.debug(f'get {id} ...')
         sess = requests.session()
         url, created = get_item_info(service, id)  # somehow info has to be downloaded before image can be downloaded
-        img = download_img(sess, url)
-        save_item(img, outfile, created, row.filename)
+        content = sess.get(url).content
+        save_item(content, outfile, created, row.filename)
         return None
     except HttpError:
         logger.error('Quota rejected downloading %s', id)
@@ -170,12 +165,13 @@ def get_file_extension(google_filename):
     return None if pos < 0 else google_filename[pos:].lower()
 
 
-def get_out_filename(google_filename):
+def fix_filename(google_filename):
     google_filename = re.sub(r'\s+', '_', google_filename)
     google_filename = re.sub(r'[()]+', '_', google_filename)
     google_filename = re.sub(r'_+', '_', google_filename)
+    google_filename = google_filename.replace("'", "_")
     pos = google_filename.rfind('.')
-    return google_filename[0:pos] + '.jpg'
+    return google_filename[0:pos] + google_filename[pos:].lower()  # lowercase the extension
 
     
 if __name__ == '__main__':
@@ -218,22 +214,15 @@ if __name__ == '__main__':
 
     # do not download video files yet!
     df = df[~pd.isnull(df.file_type)]
-    df = df[~df.file_type.isin(video_types)].copy()
     logger.info('Remaining File Types:\n%s', df.file_type.value_counts(dropna=False))
 
     df['month'] = df.creationTime.map(lambda x: os.path.join(photo_dir, '-'.join(x.split('-')[0:2])))
 
     # filter based on original filenames
-    df['orig_outfile'] = df.month + '/' + df.filename
-    df['orig_outfile_new'] = filter_outfiles(df.orig_outfile.values, df.creationTime.values)
+    df['new_filename'] = df.filename.map(fix_filename)
+    df['outfile'] = df.month + '/' + df.new_filename
+    df['orig_outfile_new'] = filter_outfiles(df.outfile.values, df.creationTime.values)
     df = df[~pd.isnull(df.orig_outfile_new)].copy()
-
-    # filter based on .jpg filenames
-    df['outfile'] = df.filename.map(get_out_filename)
-    df.outfile = df.month+"/"+df.outfile
-    df['outfile'] = filter_outfiles(df.outfile.values, df.creationTime.values)
-    df = df[~pd.isnull(df.outfile)].copy()
-    logger.info('%s photos to be downloaded', df.shape[0])
 
     bad_id_file = os.path.join(photo_dir, 'bad_ids.json')
     if os.path.exists(bad_id_file):
@@ -241,7 +230,7 @@ if __name__ == '__main__':
             bad_ids = json.load(fin)
     else:
         bad_ids = []
-    df = df[~df.id.isin(bad_ids)].copy()
+    df = df[~df.id.isin(bad_ids)].reset_index(drop=True)
     logger.info('%s photos to be downloaded after removing bad ids', df.shape[0])
 
     df = df.sort_values('creationTime', ascending=False).reset_index(drop=True)
