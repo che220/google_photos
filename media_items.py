@@ -9,7 +9,9 @@ import cv2
 import datetime as dt
 import json
 import re
-from concurrent.futures import ProcessPoolExecutor
+import threading
+from signal import signal, SIGINT
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import multiprocessing
 
 from Google import Create_Service
@@ -25,9 +27,17 @@ logging.basicConfig(format='%(asctime)s [%(name)s:%(lineno)d] [%(levelname)s] %(
                     level=logging.INFO)
 logger = logging.getLogger(os.path.dirname(__file__))
 host = platform.platform().upper()
-video_types = ['.mov', '.avi', '.mp4']
+#lock = threading.Lock()
+executor = ProcessPoolExecutor(max_workers=4)
+video_types = ['.mov', '.avi', '.mp4', '.wmv', '.mpg']
 
 # TODO: remove files without extension in the YYYY-MM directories
+
+def sigint_handler(recv_signal, frame):
+    executor.shutdown(wait=False)
+    logger.info("SIGINT or CTRL-C detected. Exiting ...")
+    exit(0)
+
 
 def init_service(secret_dir):
     # look for client id JSON file and token file in work dir
@@ -54,6 +64,8 @@ def show_img(img):
 
 
 def get_item_info(service, id):
+#    with lock:
+    # google photos API is not thread-safe
     resp = service.mediaItems().get(mediaItemId=id).execute()
     meta = resp['mediaMetadata']
     created = dt.datetime.strptime(meta['creationTime'], "%Y-%m-%dT%H:%M:%SZ")
@@ -66,8 +78,8 @@ def get_item_info(service, id):
     return url, created
 
 
-def download_img(url):
-    resp = requests.get(url)
+def download_img(session: requests.session, url):
+    resp = session.get(url)
     img = np.asarray(bytearray(resp.content), dtype="uint8")
     img = cv2.imdecode(img, cv2.IMREAD_UNCHANGED)  # pylint: disable=no-member
     return img
@@ -128,14 +140,17 @@ def download_item(service, row):
 
     try:
         logger.debug(f'get {id} ...')
+        sess = requests.session()
         url, created = get_item_info(service, id)  # somehow info has to be downloaded before image can be downloaded
-        img = download_img(url)
+        img = download_img(sess, url)
         save_item(img, outfile, created, row.filename)
         return None
     except HttpError:
         logger.error('Quota rejected downloading %s', id)
         import traceback
         traceback.print_exc()
+        return "exit"
+    except SystemExit:
         return "exit"
     except:
         logger.error('Error downloading %s', id)
@@ -162,6 +177,12 @@ def get_out_filename(google_filename):
 
     
 if __name__ == '__main__':
+    import sys
+    signal(SIGINT, sigint_handler)
+    sequential = False
+    if len(sys.argv) > 1:
+        sequential = ('-s' in sys.argv[1:])
+
     photo_dir = os.path.join(os.environ['HOME'], 'Desktop/private/photos')  # Mac
     if host.startswith('LINUX'):
         photo_dir = os.path.join(os.environ['HOME'], 'TB/photos')
@@ -210,12 +231,13 @@ if __name__ == '__main__':
     df = df[~df.id.isin(bad_ids)].copy()
     logger.info('%s photos to be downloaded after removing bad ids', df.shape[0])
 
-    df = df.sort_values('creationTime', ascending=False)
-    logger.info('head:\n%s', df.head(1))
-    logger.info('tail:\n%s', df.tail(1))
+    df = df.sort_values('creationTime', ascending=False).reset_index(drop=True)
+    logger.debug('head:\n%s', df.head(1))
+    logger.debug('tail:\n%s', df.tail(1))
     # exit(0)
 
-    if True:
+    if sequential:
+        logger.info("SEQUENTIAL DOWNLOAD")
         for i, row in df.iterrows():
             id = download_item(service, row)
             if id is None:
@@ -228,6 +250,10 @@ if __name__ == '__main__':
                 fout.write(json.dumps(bad_ids, indent=4))
                 logger.info('Bad ids are stored in %s', bad_id_file)
     else:
-        with ProcessPoolExecutor(max_workers=4) as executor:
-            for i, row in df.iterrows():
+        logger.info("PARALLEL DOWNLOAD")
+        for i, row in df.iterrows():
+            try:
                 executor.submit(download_item, service, row)
+            except:
+                traceback.print_exc()
+                continue
