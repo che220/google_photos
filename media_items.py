@@ -223,8 +223,8 @@ if __name__ == '__main__':
     # filter based on original filenames
     df['new_filename'] = df.filename.map(fix_filename)
     df['outfile'] = df.month + '/' + df.new_filename
-    df['orig_outfile_new'] = filter_outfiles(df.outfile.values, df.creationTime.values)
-    df = df[~pd.isnull(df.orig_outfile_new)].copy()
+    df.outfile = filter_outfiles(df.outfile.values, df.creationTime.values)
+    df = df[~pd.isnull(df.outfile)].copy()
 
     bad_id_file = os.path.join(photo_dir, 'bad_ids.json')
     if os.path.exists(bad_id_file):
