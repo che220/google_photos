@@ -147,14 +147,12 @@ def download_item(service, row):
         return None
     except HttpError:
         logger.error('Quota rejected downloading %s', id)
-        import traceback
         traceback.print_exc()
-        return "exit"
+        exit(0)
     except SystemExit:
-        return "exit"
+        exit(0)
     except:
         logger.error('Error downloading %s', id)
-        import traceback
         traceback.print_exc()
         return id
 
