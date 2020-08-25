@@ -137,6 +137,8 @@ def download_item(service, row):
     id = row.id
     outfile = row.outfile
     os.makedirs(os.path.dirname(outfile), exist_ok=True)
+    if os.path.exists(outfile):
+        return None
 
     try:
         logger.debug(f'get {id} ...')
