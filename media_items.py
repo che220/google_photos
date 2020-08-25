@@ -179,7 +179,12 @@ if __name__ == '__main__':
     signal(SIGINT, sigint_handler)
     sequential = False
     if len(sys.argv) > 1:
-        sequential = ('-s' in sys.argv[1:])
+        if '-h' in sys.argv:
+            logger.info("Usage: python %s [-h] [-s]", sys.argv[0])
+            logger.info("    -h: help")
+            logger.info("    -s: sequential")
+            exit(0)
+        sequential = ('-s' in sys.argv)
 
     photo_dir = os.path.join(os.environ['HOME'], 'Desktop/private/photos')  # Mac
     if host.startswith('LINUX'):
