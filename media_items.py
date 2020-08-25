@@ -148,8 +148,10 @@ def download_item(service, row):
     except HttpError:
         logger.error('Quota rejected downloading %s', id)
         traceback.print_exc()
+        os.kill(os.getppid(), SIGINT)
         exit(0)
     except SystemExit:
+        os.kill(os.getppid(), SIGINT)
         exit(0)
     except:
         logger.error('Error downloading %s', id)
@@ -170,6 +172,8 @@ def get_file_extension(google_filename):
 
 def get_out_filename(google_filename):
     google_filename = re.sub(r'\s+', '_', google_filename)
+    google_filename = re.sub(r'[()]+', '_', google_filename)
+    google_filename = re.sub(r'_+', '_', google_filename)
     pos = google_filename.rfind('.')
     return google_filename[0:pos] + '.jpg'
 
