@@ -181,22 +181,26 @@ if __name__ == '__main__':
     signal(SIGINT, sigint_handler)
     sequential = False
     token_only = False
+    info_only = False
     if len(sys.argv) > 1:
         if '-h' in sys.argv:
             logger.info("Usage: python %s [-h] [-t] [-s]", sys.argv[0])
             logger.info("    -h: help")
             logger.info("    -s: sequential")
             logger.info("    -t: get token only")
+            logger.info("    -i: info only, no download")
             exit(0)
 
         sequential = ('-s' in sys.argv)
         token_only = ('-t' in sys.argv)
-    logger.info('TOKEN ONLY: %s', token_only)
+        info_only = ('-i' in sys.argv)
 
     photo_dir = os.path.join(os.environ['HOME'], 'Desktop/private/photos')  # Mac
     if host.startswith('LINUX'):
         photo_dir = os.path.join(os.environ['HOME'], 'TB/photos')
     service = init_service(photo_dir)
+    logger.info('TOKEN ONLY: %s', token_only)
+    logger.info('INFO ONLY: %s', info_only)
     if token_only:
         exit(0)
 
@@ -238,7 +242,8 @@ if __name__ == '__main__':
     df = df.sort_values('creationTime', ascending=False).reset_index(drop=True)
     logger.debug('head:\n%s', df.head(1))
     logger.debug('tail:\n%s', df.tail(1))
-    # exit(0)
+    if info_only:
+        exit(0)
 
     if sequential:
         logger.info("SEQUENTIAL DOWNLOAD")
