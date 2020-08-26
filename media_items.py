@@ -85,7 +85,8 @@ def save_item(content, outfile, created, old_filename):
         os.system(f'touch -a -m -t {created} {outfile}')
     else:
         raise RuntimeError('Cannot handle OS type: '+host)
-    logger.info('saved into %s (was %s, created at %s)', outfile, old_filename, created)
+    fsize = os.path.getsize(outfile) / 1024 / 1024
+    logger.info('saved into %s (was %s, created at %s, size: %.2f MB)', outfile, old_filename, created, fsize)
 
 
 def download_photo_list(service):
