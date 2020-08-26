@@ -5,7 +5,6 @@ import logging
 import pandas as pd
 import numpy as np
 import requests
-import cv2
 import datetime as dt
 import json
 import re
@@ -19,7 +18,7 @@ from googleapiclient.errors import HttpError
 
 pd.set_option('display.width', 5000)
 pd.set_option('display.max_rows', 5000)
-#pd.set_option('display.max_colwidth', 5000)
+pd.set_option('display.max_colwidth', 5000)
 pd.set_option('max_columns', 600)
 pd.set_option('display.float_format', lambda x: '%.2f' % x)  # disable scientific notation for print
 
@@ -51,31 +50,24 @@ def init_service(secret_dir):
     return service
 
 
-def show_img(img):
-    logger.info("image size: %s", img.shape)
-    f = img.shape[0]//1000 + 1
-    w = img.shape[1]//f
-    h = img.shape[0]//f
-    logger.info('resize to %s x %s', w, h)
-    img = cv2.resize(img, (w, h))  # pylint: disable=no-member
-    cv2.imshow("Image", img)  # pylint: disable=no-member
-    cv2.waitKey(0)  # pylint: disable=no-member
-
-
-def get_item_info(service, id):
-    # with lock:
-    # google photos API is not thread-safe
-    resp = service.mediaItems().get(mediaItemId=id).execute()
-    meta = resp['mediaMetadata']
-    logger.debug('%s', meta)
-    created = dt.datetime.strptime(meta['creationTime'], "%Y-%m-%dT%H:%M:%SZ")
-
-    url = resp['baseUrl']
-    if 'video' in meta:
-        url += "=dv"
-    else:
-        url += "=d"
-    return url, created
+def get_batch_info(service, ids: list) -> pd.DataFrame:
+    """
+    batchGet requires list strictly. Other iterables cannot be used.
+    """
+    if len(ids) > 50:
+        raise RuntimeError("max number of ids for batchGet is 50. Abort")
+    
+    resp = service.mediaItems().batchGet(mediaItemIds=ids).execute()
+    rs = resp['mediaItemResults']
+    meta = []
+    for r in rs:
+        meta.append(r['mediaItem'])
+    batch_df = pd.DataFrame(meta)
+    batch_df['created'] = batch_df.mediaMetadata.map(lambda meta: dt.datetime.strptime(meta['creationTime'], "%Y-%m-%dT%H:%M:%SZ"))
+    batch_df['is_video'] = batch_df.mediaMetadata.map(lambda meta: 'video' in meta)
+    batch_df.loc[batch_df.is_video, 'baseUrl'] += "=dv"
+    batch_df.loc[~batch_df.is_video, 'baseUrl'] += "=d"
+    return batch_df
 
 
 def save_item(content, outfile, created, old_filename):
@@ -128,32 +120,36 @@ def filter_outfiles(outfiles, creation_times):
     return new_outfiles
 
 
-def download_item(service, row):
-    id = row.id
-    outfile = row.outfile
-    os.makedirs(os.path.dirname(outfile), exist_ok=True)
-    if os.path.exists(outfile):
-        return None
+def download_items(service, item_df):
+    batch_df = get_batch_info(service, list(item_df.id))
+    batch_df = batch_df.merge(item_df[['id', 'outfile']], on='id')
+    assert item_df.shape[0] ==  batch_df.shape[0]  # make sure the rows are the same
+    
+    for i, row in batch_df.iterrows():
+        id = row.id
+        outfile = row.outfile
+        url = row.baseUrl
+        created = row.created
+        os.makedirs(os.path.dirname(outfile), exist_ok=True)
+        if os.path.exists(outfile):
+            continue
 
-    try:
-        logger.debug(f'get {id} ...')
-        sess = requests.session()
-        url, created = get_item_info(service, id)  # somehow info has to be downloaded before image can be downloaded
-        content = sess.get(url).content
-        save_item(content, outfile, created, row.filename)
-        return None
-    except HttpError:
-        logger.error('Quota rejected downloading %s', id)
-        traceback.print_exc()
-        os.kill(os.getppid(), SIGINT)
-        exit(0)
-    except SystemExit:
-        os.kill(os.getppid(), SIGINT)
-        exit(0)
-    except:
-        logger.error('Error downloading %s', id)
-        traceback.print_exc()
-        return id
+        try:
+            logger.debug(f'get {id} ...')
+            sess = requests.session()
+            content = sess.get(url).content
+            save_item(content, outfile, created, row.filename)
+        except HttpError:
+            logger.error('Quota rejected downloading %s', id)
+            traceback.print_exc()
+            os.kill(os.getppid(), SIGINT)
+            exit(0)
+        except SystemExit:
+            os.kill(os.getppid(), SIGINT)
+            exit(0)
+        except:
+            logger.error('Error downloading %s', id)
+            traceback.print_exc()
 
 
 def get_creation_time(metadata):
@@ -226,15 +222,6 @@ if __name__ == '__main__':
     df.outfile = filter_outfiles(df.outfile.values, df.creationTime.values)
     df = df[~pd.isnull(df.outfile)].copy()
 
-    bad_id_file = os.path.join(photo_dir, 'bad_ids.json')
-    if os.path.exists(bad_id_file):
-        with open(bad_id_file, 'r') as fin:
-            bad_ids = json.load(fin)
-    else:
-        bad_ids = []
-    df = df[~df.id.isin(bad_ids)].reset_index(drop=True)
-    logger.info('%s photos to be downloaded after removing bad ids', df.shape[0])
-
     df = df.sort_values('creationTime', ascending=False).reset_index(drop=True)
     logger.debug('head:\n%s', df.head(1))
     logger.debug('tail:\n%s', df.tail(1))
@@ -245,22 +232,20 @@ if __name__ == '__main__':
 
     if sequential:
         logger.info("SEQUENTIAL DOWNLOAD")
-        for i, row in df.iterrows():
-            id = download_item(service, row)
-            if id is None:
-                continue
-            if id == 'exit':
-                break
-
-            bad_ids.append(id)
-            with open(bad_id_file, 'w') as fout:
-                fout.write(json.dumps(bad_ids, indent=4))
-                logger.info('Bad ids are stored in %s', bad_id_file)
     else:
         logger.info("PARALLEL DOWNLOAD")
-        for i, row in df.iterrows():
+
+    # baseUrl quota is 75000. But all requests quota is 10000. So we need to use batchGet
+    batch_max = 50
+    for st_row in range(0, df.shape[0], batch_max):
+        end_row = min(st_row+batch_max, df.shape[0])
+        item_df = df.iloc[st_row:end_row, :].copy().reset_index(drop=True)
+        logger.info('working on %s to %s ...', st_row, end_row)
+        
+        if sequential:
+            download_items(service, item_df)
+        else:
             try:
-                executor.submit(download_item, service, row)
+                executor.submit(download_items, service, item_df)
             except:
                 traceback.print_exc()
-                continue

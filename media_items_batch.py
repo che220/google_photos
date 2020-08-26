@@ -47,13 +47,9 @@ if __name__ == '__main__':
     list_file = os.path.join(photo_dir, 'photo_list.csv')
     df = pd.read_csv(list_file)
     
-    df['creationTime'] = df.mediaMetadata.map(get_creation_time)
-    df['file_type'] = df.filename.map(get_file_extension)
-    df = df[~pd.isnull(df.file_type)]
-
-    df['month'] = df.creationTime.map(lambda x: os.path.join(photo_dir, '-'.join(x.split('-')[0:2])))
-    df = df.sort_values('creationTime', ascending=False).reset_index(drop=True)
-
-    ids = df.id.values[0:10]
+    ids = list(df.id)[0:50]
     resp = service.mediaItems().batchGet(mediaItemIds=ids).execute()
-    meta = resp['mediaMetadata']
+    meta = resp['mediaItemResults']
+    print(len(meta))
+    a = meta[0]['mediaItem']
+    
