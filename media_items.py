@@ -227,12 +227,12 @@ if __name__ == '__main__':
     df = df.sort_values('creationTime', ascending=False).reset_index(drop=True)
     logger.debug('head:\n%s', df.head(1))
     logger.debug('tail:\n%s', df.tail(1))
+    logger.info('%s media items to be downloaded', df.shape[0])
     if info_only:
         logger.info('File Types:\n%s', df.file_type.value_counts(dropna=False).sort_index())
         logger.info('Month Counts:\n%s', df.month.value_counts().sort_index())
         exit(0)
 
-    logger.info('%s media items to be downloaded', df.shape[0])
     if sequential:
         logger.info("SEQUENTIAL DOWNLOAD")
     else:
