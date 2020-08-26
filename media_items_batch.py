@@ -177,42 +177,11 @@ def fix_filename(google_filename):
 
     
 if __name__ == '__main__':
-    import sys
-    signal(SIGINT, sigint_handler)
-    sequential = False
-    token_only = False
-    info_only = False
-    if len(sys.argv) > 1:
-        if '-h' in sys.argv:
-            logger.info("Usage: python %s [-h] [-t] [-s]", sys.argv[0])
-            logger.info("    -h: help")
-            logger.info("    -s: sequential")
-            logger.info("    -t: get token only")
-            logger.info("    -i: info only, no download")
-            exit(0)
-
-        sequential = ('-s' in sys.argv)
-        token_only = ('-t' in sys.argv)
-        info_only = ('-i' in sys.argv)
-
-    photo_dir = os.path.join(os.environ['HOME'], 'Desktop/private/photos')  # Mac
-    if host.startswith('LINUX'):
-        photo_dir = os.path.join(os.environ['HOME'], 'TB/photos')
+    photo_dir = os.path.join(os.environ['HOME'], 'TB/photos')
     service = init_service(photo_dir)
-    logger.info('TOKEN ONLY: %s', token_only)
-    logger.info('INFO ONLY: %s', info_only)
-    if token_only:
-        exit(0)
 
     list_file = os.path.join(photo_dir, 'photo_list.csv')
-    if not os.path.exists(list_file):
-        df = download_photo_list(service)
-        df.mediaMetadata = df.mediaMetadata.map(str)
-        df.to_csv(list_file, header=True, index=False)
-        logger.info('saved list file: %s', list_file)
-    else:
-        logger.info('load list from %s', list_file)
-        df = pd.read_csv(list_file)
+    df = pd.read_csv(list_file)
     
     df['creationTime'] = df.mediaMetadata.map(get_creation_time)
     df['file_type'] = df.filename.map(get_file_extension)
@@ -227,12 +196,6 @@ if __name__ == '__main__':
     df = df[~pd.isnull(df.outfile)].copy()
 
     df = df.sort_values('creationTime', ascending=False).reset_index(drop=True)
-    logger.debug('head:\n%s', df.head(1))
-    logger.debug('tail:\n%s', df.tail(1))
-    if info_only:
-        logger.info('File Types:\n%s', df.file_type.value_counts(dropna=False).sort_index())
-        logger.info('Month Counts:\n%s', df.month.value_counts().sort_index())
-        exit(0)
 
     ids = df.id.values[0:10]
     resp = service.mediaItems().batchGet(mediaItemIds=ids).execute()
