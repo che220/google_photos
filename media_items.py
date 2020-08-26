@@ -121,6 +121,8 @@ def filter_outfiles(outfiles, creation_times):
 
 
 def download_items(service, item_df):
+    logger.info('working on %s to %s ...', item_df.index.min(), item_df.index.max())
+    item_df = item_df.reset_index(drop=True)
     batch_df = get_batch_info(service, list(item_df.id))
     batch_df = batch_df.merge(item_df[['id', 'outfile']], on='id')
     assert item_df.shape[0] ==  batch_df.shape[0]  # make sure the rows are the same
@@ -230,6 +232,7 @@ if __name__ == '__main__':
         logger.info('Month Counts:\n%s', df.month.value_counts().sort_index())
         exit(0)
 
+    logger.info('%s media items to be downloaded', df.shape[0])
     if sequential:
         logger.info("SEQUENTIAL DOWNLOAD")
     else:
@@ -239,8 +242,7 @@ if __name__ == '__main__':
     batch_max = 50
     for st_row in range(0, df.shape[0], batch_max):
         end_row = min(st_row+batch_max, df.shape[0])
-        item_df = df.iloc[st_row:end_row, :].copy().reset_index(drop=True)
-        logger.info('working on %s to %s ...', st_row, end_row)
+        item_df = df.iloc[st_row:end_row, :].copy()
         
         if sequential:
             download_items(service, item_df)
