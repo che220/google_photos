@@ -216,11 +216,8 @@ if __name__ == '__main__':
     
     df['creationTime'] = df.mediaMetadata.map(get_creation_time)
     df['file_type'] = df.filename.map(get_file_extension)
-    logger.info('File Types:\n%s', df.file_type.value_counts(dropna=False))
-
-    # do not download video files yet!
     df = df[~pd.isnull(df.file_type)]
-    logger.info('Remaining File Types:\n%s', df.file_type.value_counts(dropna=False))
+    logger.debug('File Types:\n%s', df.file_type.value_counts(dropna=False))
 
     df['month'] = df.creationTime.map(lambda x: os.path.join(photo_dir, '-'.join(x.split('-')[0:2])))
 
