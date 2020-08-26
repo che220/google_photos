@@ -208,6 +208,7 @@ if __name__ == '__main__':
         df.mediaMetadata = df.mediaMetadata.map(str)
         df.to_csv(list_file, header=True, index=False)
         logger.info('saved list file: %s', list_file)
+	exit(0)
     else:
         logger.info('load list from %s', list_file)
         df = pd.read_csv(list_file)
