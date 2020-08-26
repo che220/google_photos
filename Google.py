@@ -7,7 +7,7 @@ from googleapiclient.http import MediaFileUpload
 from google.auth.transport.requests import Request
 
 logger = logging.getLogger(os.path.dirname(__file__))
-logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
+logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)  # silent the harmless google-auth/oauth2client error message
 
 
 def Create_Service(client_secret_file, api_name, api_version, *scopes):
