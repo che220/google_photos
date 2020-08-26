@@ -217,7 +217,6 @@ if __name__ == '__main__':
     df['creationTime'] = df.mediaMetadata.map(get_creation_time)
     df['file_type'] = df.filename.map(get_file_extension)
     df = df[~pd.isnull(df.file_type)]
-    logger.debug('File Types:\n%s', df.file_type.value_counts(dropna=False))
 
     df['month'] = df.creationTime.map(lambda x: os.path.join(photo_dir, '-'.join(x.split('-')[0:2])))
 
@@ -240,6 +239,8 @@ if __name__ == '__main__':
     logger.debug('head:\n%s', df.head(1))
     logger.debug('tail:\n%s', df.tail(1))
     if info_only:
+        logger.info('File Types:\n%s', df.file_type.value_counts(dropna=False).sort_index())
+        logger.info('Month Counts:\n%s', df.month.value_counts().sort_index())
         exit(0)
 
     if sequential:
