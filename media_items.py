@@ -24,7 +24,7 @@ pd.set_option('display.float_format', lambda x: '%.2f' % x)  # disable scientifi
 
 logging.basicConfig(format='%(asctime)s [%(name)s:%(lineno)d] [%(levelname)s] %(message)s',
                     level=logging.INFO)
-logger = logging.getLogger(os.path.dirname(__file__))
+logger = logging.getLogger(os.path.basename(__file__))
 host = platform.platform().upper()
 #lock = threading.Lock()
 executor = ProcessPoolExecutor(max_workers=4)
