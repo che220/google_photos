@@ -8,5 +8,6 @@
         "python.pythonPath": "/home/hui/venvs/venv_w2/bin/python3"
     },
     "python.pythonPath": "/home/hui/venvs/venv_w2/bin/python",
-    "terminal.integrated.scrollback": 100000
+    "terminal.integrated.scrollback": 100000,
+    "python.dataScience.sendSelectionToInteractiveWindow": false
 }
