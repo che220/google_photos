@@ -6,7 +6,7 @@ import datetime as dt
 import json
 import re
 
-from Google import Create_Service
+from google_api import create_service
 from googleapiclient.errors import HttpError
 
 pd.set_option('display.width', 5000)
@@ -24,7 +24,7 @@ def init_service(secret_dir):
     # SCOPES = ['https://www.googleapis.com/auth/photoslibrary', 'https://www.googleapis.com/auth/photoslibrary.sharing']
     SCOPES = ['https://www.googleapis.com/auth/photoslibrary']
 
-    service = Create_Service(CLIENT_SECRET_FILE, API_NAME, API_VERSION, SCOPES)
+    service = create_service(CLIENT_SECRET_FILE, API_NAME, API_VERSION, SCOPES)
     # print(dir(service))
     return service
 

@@ -1,6 +1,6 @@
 import os
 import logging
-from Google import Create_Service
+from google_api import create_service
 import pandas as pd
 
 logging.basicConfig(format='%(asctime)s [%(name)s:%(lineno)d] [%(levelname)s] %(message)s',
@@ -13,6 +13,6 @@ def init_service(secret_dir):
     CLIENT_SECRET_FILE = os.path.join(secret_dir, 'client_secret_photos.json')
     SCOPES = ['https://www.googleapis.com/auth/photoslibrary', 'https://www.googleapis.com/auth/photoslibrary.sharing']
 
-    service = Create_Service(CLIENT_SECRET_FILE, API_NAME, API_VERSION, SCOPES)
+    service = create_service(CLIENT_SECRET_FILE, API_NAME, API_VERSION, SCOPES)
     # print(dir(service))
     return service

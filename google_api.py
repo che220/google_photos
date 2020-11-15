@@ -11,7 +11,7 @@ logger = logging.getLogger(os.path.basename(__file__))
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 
 
-def Create_Service(client_secret_file, api_name, api_version, *in_scopes):
+def create_service(client_secret_file, api_name, api_version, *in_scopes):
     client_secret_file = client_secret_file
     api_service_name = api_name
     api_version = api_version
@@ -50,6 +50,6 @@ def Create_Service(client_secret_file, api_name, api_version, *in_scopes):
     return None
  
  
-def convert_to_RFC_datetime(year=1900, month=1, day=1, hour=0, minute=0):
+def convert_to_rfc_datetime(year=1900, month=1, day=1, hour=0, minute=0):
     converted_time = dt.datetime(year, month, day, hour, minute, 0).isoformat() + 'Z'
     return converted_time

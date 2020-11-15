@@ -15,7 +15,7 @@ import re
 from signal import signal, SIGINT
 from concurrent.futures import ProcessPoolExecutor
 
-from Google import Create_Service
+from google_api import create_service
 from googleapiclient.errors import HttpError
 
 pd.set_option('display.width', 5000)
@@ -56,7 +56,7 @@ def init_service(secret_dir):
     #           'https://www.googleapis.com/auth/photoslibrary.sharing']
     scopes = ['https://www.googleapis.com/auth/photoslibrary']
 
-    service = Create_Service(client_secret_file, api_name, api_version, scopes)
+    service = create_service(client_secret_file, api_name, api_version, scopes)
     return service
 
 
