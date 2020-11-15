@@ -6,6 +6,7 @@ import shutil
 exts = set()
 media_types = ['.jpg', '.tif', '.png', '.gif', '.mov', '.mp4',  '.mpg', '.heic', 'webp', '.jpeg']
 
+
 def get_photos(files, in_dir):
     for file in os.listdir(in_dir):
         if file.startswith("."):
