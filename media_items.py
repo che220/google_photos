@@ -32,8 +32,6 @@ host = platform.platform().upper()
 executor = ProcessPoolExecutor(max_workers=4)
 
 
-# TODO: remove files without extension in the YYYY-MM directories
-
 def sigint_handler(recv_signal, frame):  # pylint: disable=unused-argument
     """
     handle ctrl-c
@@ -129,7 +127,7 @@ def filter_outfile(outfile):
     """
     if outfile exists, make it None so it can be filtered out
 
-    :param outfiles:
+    :param outfile:
     :return:
     """
     return None if os.path.exists(outfile) else outfile

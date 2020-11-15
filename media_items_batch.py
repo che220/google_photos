@@ -1,30 +1,26 @@
 import os
 import pandas as pd
-import numpy as np
-import requests
-import datetime as dt
 import json
-import re
 
 from google_api import create_service
-from googleapiclient.errors import HttpError
 
 pd.set_option('display.width', 5000)
 pd.set_option('display.max_rows', 5000)
-#pd.set_option('display.max_colwidth', 5000)
+# pd.set_option('display.max_colwidth', 5000)
 pd.set_option('max_columns', 600)
 pd.set_option('display.float_format', lambda x: '%.2f' % x)  # disable scientific notation for print
 
 
 def init_service(secret_dir):
     # look for client id JSON file and token file in work dir
-    API_NAME = "photoslibrary"
-    API_VERSION = "v1"
-    CLIENT_SECRET_FILE = os.path.join(secret_dir, 'client_secret_photos.json')
-    # SCOPES = ['https://www.googleapis.com/auth/photoslibrary', 'https://www.googleapis.com/auth/photoslibrary.sharing']
-    SCOPES = ['https://www.googleapis.com/auth/photoslibrary']
+    api_name = "photoslibrary"
+    api_version = "v1"
+    client_secret_file = os.path.join(secret_dir, 'client_secret_photos.json')
+    # scopes = ['https://www.googleapis.com/auth/photoslibrary',
+    #           'https://www.googleapis.com/auth/photoslibrary.sharing']
+    scopes = ['https://www.googleapis.com/auth/photoslibrary']
 
-    service = create_service(CLIENT_SECRET_FILE, API_NAME, API_VERSION, SCOPES)
+    service = create_service(client_secret_file, api_name, api_version, scopes)
     # print(dir(service))
     return service
 
@@ -39,17 +35,20 @@ def get_file_extension(google_filename):
     pos = google_filename.rfind('.')
     return None if pos < 0 else google_filename[pos:].lower()
 
-    
-if __name__ == '__main__':
+
+def main():
     photo_dir = os.path.join(os.environ['HOME'], 'TB/photos')
     service = init_service(photo_dir)
 
     list_file = os.path.join(photo_dir, 'photo_list.csv')
     df = pd.read_csv(list_file)
-    
+
     ids = list(df.id)[0:50]
     resp = service.mediaItems().batchGet(mediaItemIds=ids).execute()
     meta = resp['mediaItemResults']
     print(len(meta))
     a = meta[0]['mediaItem']
-    
+
+
+if __name__ == '__main__':
+    main()
