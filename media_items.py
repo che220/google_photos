@@ -99,13 +99,14 @@ def save_item(content, outfile, created, old_filename):
                 outfile, old_filename, created, fsize)
 
 
-def download_photo_list(service):
+def download_photo_list(service, list_file):
     """
     download list of photos
 
     :param service:
     :return: pandas dataframe with photo info
     """
+    logger.info('Download photo list ...')
     page_size = 100
     resp = service.mediaItems().list(pageSize=page_size).execute()
     items = resp.get('mediaItems')
@@ -120,7 +121,9 @@ def download_photo_list(service):
         logger.info('done batch %s', cnt)
 
     df = pd.DataFrame(items)
-    return df
+    df.mediaMetadata = df.mediaMetadata.map(str)
+    df.to_csv(list_file, header=True, index=False)
+    logger.info('saved list file: %s (total photos: %s)', list_file, df.shape)
 
 
 def filter_outfile(outfile):
@@ -206,32 +209,20 @@ def fix_filename(google_filename):
     return google_filename[0:pos] + google_filename[pos:].lower()  # lowercase the extension
 
 
-def main():
-    signal(SIGINT, sigint_handler)
+def read_photo_list_file(service, photo_dir, download_filter_func):
+    """
 
-    parser = ArgumentParser()
-    parser.add_argument('-s', '--sequential', action="store_true", help='sequential download')
-    parser.add_argument('-t', '--token-only', action="store_true", help='get token only')
-    parser.add_argument('-i', '--info-only', action="store_true", help='info only. no download')
-    args = parser.parse_args()
-    logger.info('options: %s', args)
-
-    photo_dir = os.path.join(os.environ['HOME'], 'Desktop/private/photos')  # Mac
-    if host.startswith('LINUX'):
-        photo_dir = os.path.join(os.environ['HOME'], 'TB/photos')
-    service = init_service(photo_dir)
-    if args.token_only:
-        exit(0)
-
+    :param service:
+    :param photo_dir:
+    :param download_filter_func: function to filter outfile
+    :return:
+    """
     list_file = os.path.join(photo_dir, 'photo_list.csv')
     if not os.path.exists(list_file):
-        logger.info('Download photo list ...')
-        photo_list_df = download_photo_list(service)
-        photo_list_df.mediaMetadata = photo_list_df.mediaMetadata.map(str)
-        photo_list_df.to_csv(list_file, header=True, index=False)
-        logger.info('saved list file: %s (total photos: %s)', list_file, photo_list_df.shape)
+        download_photo_list(service, list_file)
         sys.exit(0)
 
+    list_file = os.path.join(photo_dir, 'photo_list.csv')
     photo_list_df = pd.read_csv(list_file)
     logger.info('loaded list from %s: %s', list_file, photo_list_df.shape)
     logger.info('dataframe structure:\n%s', photo_list_df.dtypes)
@@ -252,24 +243,57 @@ def main():
     photo_list_df['new_filename'] = photo_list_df.filename.map(fix_filename)
     # outfile: $HOME/TB/photos/2007-05/IMG_1980.jpeg
     photo_list_df['outfile'] = photo_list_df.month + '/' + photo_list_df.new_filename
-    photo_list_df.outfile = photo_list_df.outfile.map(filter_outfile)
+
+    photo_list_df.outfile = photo_list_df.outfile.map(download_filter_func)
     # drop existing outfiles
     photo_list_df = photo_list_df[~pd.isnull(photo_list_df.outfile)].copy()
-    if photo_list_df.empty:
-        logger.info('All photos were downloaded. Nothing more to download.')
-        sys.exit(0)
 
     photo_list_df = photo_list_df.sort_values('creationTime', ascending=False)
     photo_list_df.reset_index(drop=True, inplace=True)
     logger.debug('head:\n%s', photo_list_df.head(1))
     logger.debug('tail:\n%s', photo_list_df.tail(1))
     logger.info('%s media items to be downloaded', photo_list_df.shape[0])
+
+    return photo_list_df
+
+
+def get_output_dir():
+    photo_dir = os.path.join(os.environ['HOME'], 'Desktop/private/photos')  # Mac
+    if host.startswith('LINUX'):
+        photo_dir = os.path.join(os.environ['HOME'], 'TB/photos')
+    return photo_dir
+
+
+def parse_args():
+    parser = ArgumentParser()
+    parser.add_argument('-s', '--sequential', action="store_true", help='sequential download')
+    parser.add_argument('-t', '--token-only', action="store_true", help='get token only')
+    parser.add_argument('-i', '--info-only', action="store_true", help='info only. no download')
+    args = parser.parse_args()
+    logger.info('options: %s', args)
+    return args
+
+
+def main():
+    signal(SIGINT, sigint_handler)
+
+    args = parse_args()
+    photo_dir = get_output_dir()
+    service = init_service(photo_dir)
+    if args.token_only:
+        exit(0)
+
+    photo_list_df = read_photo_list_file(service, photo_dir, filter_outfile)
+    if photo_list_df.empty:
+        logger.info('All photos were downloaded. Nothing more to download.')
+        sys.exit(0)
+
     if args.info_only:
         logger.info('File Types:\n%s',
                     photo_list_df.file_type.value_counts(dropna=False).sort_index())
         logger.info('Month Counts:\n%s',
                     photo_list_df.month.value_counts().sort_index())
-        exit(0)
+        sys.exit(0)
 
     if args.sequential:
         logger.info("SEQUENTIAL DOWNLOAD")
