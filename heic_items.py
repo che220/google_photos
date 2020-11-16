@@ -5,8 +5,10 @@ import os
 import logging
 import pandas as pd
 import glob
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
+import pyheif
 from concurrent.futures import ProcessPoolExecutor, as_completed
+import traceback
 
 pd.set_option('display.width', 5000)
 pd.set_option('display.max_rows', 5000)
@@ -25,9 +27,17 @@ def convert_to_jpg(heic_file):
         if not os.path.exists(outfile):
             im = Image.open(heic_file)
             im.save(outfile)
-            logger.info('converted: %s -> %s (%s)', heic_file, outfile, im.size)
+            logger.info('converted: %s -> %s %s', heic_file, outfile, im.size)
+        return outfile
+    except UnidentifiedImageError:
+        heif_file = pyheif.read(heic_file)
+        im = Image.frombytes(heif_file.mode, heif_file.size, heif_file.data, "raw",
+                             heif_file.mode, heif_file.stride,)
+        im.save(outfile)
+        logger.info('HEIF converted: %s -> %s %s', heic_file, outfile, im.size)
         return outfile
     except:
+        traceback.print_exc()
         logger.info("cannot convert %s", heic_file)
         return None
 
