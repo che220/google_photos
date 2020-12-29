@@ -7,16 +7,18 @@ import sys
 import traceback
 import platform
 import logging
-import pandas as pd
-import requests
 import datetime as dt
 import json
 import re
 from signal import signal, SIGINT
 from concurrent.futures import ProcessPoolExecutor
+import requests
+
+import pandas as pd
+
+from googleapiclient.errors import HttpError
 
 from google_api import create_service
-from googleapiclient.errors import HttpError
 
 pd.set_option('display.width', 5000)
 pd.set_option('display.max_rows', 5000)
@@ -46,6 +48,12 @@ def sigint_handler(recv_signal, frame):  # pylint: disable=unused-argument
 
 
 def init_service(secret_dir):
+    """
+    start google photo service by collecting credentials etc.
+
+    :param secret_dir:
+    :return:
+    """
     # look for client id JSON file and token file in work dir
     api_name = "photoslibrary"
     api_version = "v1"
@@ -80,6 +88,15 @@ def get_batch_info(service, ids: list) -> pd.DataFrame:
 
 
 def save_item(content, outfile, created, old_filename):
+    """
+    save content to outfile with created timestamp
+
+    :param content:
+    :param outfile:
+    :param created:
+    :param old_filename:
+    :return:
+    """
     with open(outfile, 'wb') as fout:
         fout.write(content)
 
@@ -104,6 +121,7 @@ def download_photo_list(service, list_file):
     download list of photos
 
     :param service:
+    :param list_file:
     :return: pandas dataframe with photo info
     """
     logger.info('Download photo list ...')
@@ -120,10 +138,10 @@ def download_photo_list(service, list_file):
         cnt += 1
         logger.info('done batch %s', cnt)
 
-    df = pd.DataFrame(items)
-    df.mediaMetadata = df.mediaMetadata.map(str)
-    df.to_csv(list_file, header=True, index=False)
-    logger.info('saved list file: %s (total photos: %s)', list_file, df.shape)
+    list_df = pd.DataFrame(items)
+    list_df.mediaMetadata = list_df.mediaMetadata.map(str)
+    list_df.to_csv(list_file, header=True, index=False)
+    logger.info('saved list file: %s (total photos: %s)', list_file, list_df.shape)
 
 
 def filter_outfile(outfile):
@@ -137,6 +155,13 @@ def filter_outfile(outfile):
 
 
 def download_items(service, item_df) -> None:
+    """
+    take item_df and download items one by one
+
+    :param service:
+    :param item_df:
+    :return:
+    """
     logger.info('working on %s to %s ...', item_df.index.min(), item_df.index.max())
     item_df.reset_index(drop=True, inplace=True)
     batch_df = get_batch_info(service, list(item_df.id))
@@ -154,7 +179,7 @@ def download_items(service, item_df) -> None:
 
         # noinspection PyBroadException
         try:
-            logger.debug(f'get {item_id} ...')
+            logger.debug('get %s ...', item_id)
             sess = requests.session()
             content = sess.get(url).content
             save_item(content, outfile, created, row.filename)
@@ -162,11 +187,11 @@ def download_items(service, item_df) -> None:
             logger.error('Quota rejected downloading %s', item_id)
             traceback.print_exc()
             os.kill(os.getppid(), SIGINT)
-            exit(0)
+            sys.exit(0)
         except SystemExit:
             os.kill(os.getppid(), SIGINT)
-            exit(0)
-        except:
+            sys.exit(0)
+        except:  # pylint: disable=bare-except
             logger.error('Error downloading %s', item_id)
             traceback.print_exc()
 
@@ -234,8 +259,8 @@ def read_photo_list_file(service, photo_dir, download_filter_func):
     photo_list_df['file_type'] = photo_list_df.filename.map(get_file_extension)
     photo_list_df = photo_list_df[~pd.isnull(photo_list_df.file_type)]
 
-    def get_month_path(x):
-        return os.path.join(photo_dir, '-'.join(x.split('-')[0:2]))
+    def get_month_path(goole_name):
+        return os.path.join(photo_dir, '-'.join(goole_name.split('-')[0:2]))
     # month: $HOME/TB/photos/2007-05
     photo_list_df['month'] = photo_list_df.creationTime.map(get_month_path)
 
@@ -258,6 +283,10 @@ def read_photo_list_file(service, photo_dir, download_filter_func):
 
 
 def get_output_dir():
+    """
+
+    :return: output directory
+    """
     photo_dir = os.path.join(os.environ['HOME'], 'Desktop/private/photos')  # Mac
     if host.startswith('LINUX'):
         photo_dir = os.path.join(os.environ['HOME'], 'TB/photos')
@@ -265,6 +294,10 @@ def get_output_dir():
 
 
 def parse_args():
+    """
+
+    :return: arguments
+    """
     parser = ArgumentParser()
     parser.add_argument('-s', '--sequential', action="store_true", help='sequential download')
     parser.add_argument('-t', '--token-only', action="store_true", help='get token only')
@@ -275,13 +308,18 @@ def parse_args():
 
 
 def main():
+    """
+    app entry point
+
+    :return:
+    """
     signal(SIGINT, sigint_handler)
 
     args = parse_args()
     photo_dir = get_output_dir()
     service = init_service(photo_dir)
     if args.token_only:
-        exit(0)
+        sys.exit(0)
 
     photo_list_df = read_photo_list_file(service, photo_dir, filter_outfile)
     if photo_list_df.empty:
@@ -312,7 +350,7 @@ def main():
             # noinspection PyBroadException
             try:
                 executor.submit(download_items, service, item_df)
-            except Exception:  # pylint: disable=store_true
+            except Exception:  # pylint: disable=broad-except
                 traceback.print_exc()
 
 

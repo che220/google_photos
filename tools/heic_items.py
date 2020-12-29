@@ -3,12 +3,13 @@ Convert HEIC to JPG
 """
 import os
 import logging
-import pandas as pd
 import glob
-from PIL import Image, UnidentifiedImageError
-import pyheif
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import traceback
+
+import pyheif
+from PIL import Image, UnidentifiedImageError
+import pandas as pd
 
 pd.set_option('display.width', 5000)
 pd.set_option('display.max_rows', 5000)
@@ -22,27 +23,38 @@ logger = logging.getLogger(os.path.basename(__file__))
 
 
 def convert_to_jpg(heic_file):
+    """
+
+    :param heic_file: input file
+    :return:
+    """
     outfile = heic_file.replace('.', '_') + '.jpg'
+    # noinspection PyBroadException
     try:
         if not os.path.exists(outfile):
-            im = Image.open(heic_file)
-            im.save(outfile)
-            logger.info('converted: %s -> %s %s', heic_file, outfile, im.size)
+            image = Image.open(heic_file)
+            image.save(outfile)
+            logger.info('converted: %s -> %s %s', heic_file, outfile, image.size)
         return outfile
     except UnidentifiedImageError:
         heif_file = pyheif.read(heic_file)
-        im = Image.frombytes(heif_file.mode, heif_file.size, heif_file.data, "raw",
-                             heif_file.mode, heif_file.stride,)
-        im.save(outfile)
-        logger.info('HEIF converted: %s -> %s %s', heic_file, outfile, im.size)
+        image = Image.frombytes(heif_file.mode, heif_file.size, heif_file.data, "raw",
+                                heif_file.mode, heif_file.stride, )
+        image.save(outfile)
+        logger.info('HEIF converted: %s -> %s %s', heic_file, outfile, image.size)
         return outfile
-    except:
+    except:  # pylint: disable=bare-except
         traceback.print_exc()
         logger.info("cannot convert %s", heic_file)
         return None
 
 
 def main():
+    """
+    entry point
+
+    :return:
+    """
     root_dir = os.path.join(os.environ['HOME'], 'TB/photos')
     heic_files = sorted(glob.glob(os.path.join(root_dir, '[0-9][0-9][0-9][0-9]-[0-9][0-9]/*.heic')))
 
@@ -51,25 +63,26 @@ def main():
 
     success = 0
     failed = []
-    cnt = 0
     with ProcessPoolExecutor() as executor:
         fut_to_file = {executor.submit(convert_to_jpg, file): file for file in heic_files}
         for fut in as_completed(fut_to_file):
             infile = fut_to_file[fut]
+            # noinspection PyBroadException
             try:
                 result = fut.result()
                 if result is None:
                     failed.append(infile)
                 else:
                     success += 1
-            except:
+            except:  # pylint: disable=bare-except
                 failed.append(infile)
 
     logger.info('total %s heic files', total_files)
     logger.info('converted %s', success)
     logger.info('failed %s', len(failed))
     logger.info('Failed files:')
-    [logger.info('\t\t%s', f) for f in failed]
+    for failure in failed:
+        logger.info('\t\t%s', failure)
 
 
 if __name__ == '__main__':
