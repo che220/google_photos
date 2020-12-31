@@ -4,7 +4,9 @@
 
 1. Google search for "sheets api python". Go to https://developers.google.com/sheets/api/quickstart/python
 
+
     pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+   
     pip install pandas
 
 2. Copied Google.py from https://learndataanalysis.org/getting-started-with-google-photos-api-and-python-part-1/
