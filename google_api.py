@@ -51,7 +51,7 @@ def create_service(client_secret_file, api_name, api_version, *in_scopes):
 
     try:
         logger.info('CLIENT ID: %s', cred.client_id)
-        service = build(api_service_name, api_version, credentials=cred)
+        service = build(api_service_name, api_version, credentials=cred, static_discovery=False)
         logger.info('%s service created successfully', api_service_name)
         return service
     except Exception as exc:  # pylint: disable=broad-except
