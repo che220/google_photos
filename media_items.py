@@ -336,7 +336,6 @@ def main():
     service = init_service(token_file)
     if args.token_only:
         sys.exit(0)
-    exit(0)
 
     photo_list_df = read_photo_list_file(service, photo_dir,
                                          list_file=photo_list_file,
