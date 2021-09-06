@@ -65,25 +65,6 @@ def init_service(client_secret_file):
     return service
 
 
-def init_service0(secret_dir):
-    """
-    start google photo service by collecting credentials etc.
-
-    :param secret_dir:
-    :return:
-    """
-    # look for client id JSON file and token file in work dir
-    api_name = "photoslibrary"
-    api_version = "v1"
-    client_secret_file = os.path.join(secret_dir, 'client_secret_photos.json')
-    # scopes = ['https://www.googleapis.com/auth/photoslibrary',
-    #           'https://www.googleapis.com/auth/photoslibrary.sharing']
-    scopes = ['https://www.googleapis.com/auth/photoslibrary']
-
-    service = create_service(client_secret_file, api_name, api_version, scopes)
-    return service
-
-
 def get_batch_info(service, ids: list) -> pd.DataFrame:
     """
     batchGet requires list strictly. Other iterables cannot be used.
