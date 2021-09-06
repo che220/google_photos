@@ -259,15 +259,16 @@ def read_photo_list_file(service, photo_dir, download_filter_func):
     photo_list_df['file_type'] = photo_list_df.filename.map(get_file_extension)
     photo_list_df = photo_list_df[~pd.isnull(photo_list_df.file_type)]
 
-    def get_month_path(goole_name):
-        return os.path.join(photo_dir, '-'.join(goole_name.split('-')[0:2]))
-    # month: $HOME/TB/photos/2007-05
-    photo_list_df['month'] = photo_list_df.creationTime.map(get_month_path)
+    def get_file_dir(goole_name):
+        parts = goole_name.split('-')
+        return os.path.join(photo_dir, '-'.join(parts[0:2]), parts[2][:2])
+    # file_dir: $HOME/TB/photos/2007-05/01
+    photo_list_df['file_dir'] = photo_list_df.creationTime.map(get_file_dir)
 
     # filter based on original filenames
     photo_list_df['new_filename'] = photo_list_df.filename.map(fix_filename)
     # outfile: $HOME/TB/photos/2007-05/IMG_1980.jpeg
-    photo_list_df['outfile'] = photo_list_df.month + '/' + photo_list_df.new_filename
+    photo_list_df['outfile'] = photo_list_df.file_dir + '/' + photo_list_df.new_filename
 
     photo_list_df.outfile = photo_list_df.outfile.map(download_filter_func)
     # drop existing outfiles
@@ -329,8 +330,8 @@ def main():
     if args.info_only:
         logger.info('File Types:\n%s',
                     photo_list_df.file_type.value_counts(dropna=False).sort_index())
-        logger.info('Month Counts:\n%s',
-                    photo_list_df.month.value_counts().sort_index())
+        logger.info('File Dir Counts:\n%s',
+                    photo_list_df.file_dir.value_counts().sort_index())
         sys.exit(0)
 
     if args.sequential:
