@@ -47,7 +47,25 @@ def sigint_handler(recv_signal, frame):  # pylint: disable=unused-argument
     sys.exit(0)
 
 
-def init_service(secret_dir):
+def init_service(client_secret_file):
+    """
+    start google photo service by collecting credentials etc.
+
+    :param client_secret_file:
+    :return:
+    """
+    # look for client id JSON file and token file in work dir
+    api_name = "photoslibrary"
+    api_version = "v1"
+    # scopes = ['https://www.googleapis.com/auth/photoslibrary',
+    #           'https://www.googleapis.com/auth/photoslibrary.sharing']
+    scopes = ['https://www.googleapis.com/auth/photoslibrary']
+
+    service = create_service(client_secret_file, api_name, api_version, scopes)
+    return service
+
+
+def init_service0(secret_dir):
     """
     start google photo service by collecting credentials etc.
 
@@ -234,7 +252,7 @@ def fix_filename(google_filename):
     return google_filename[0:pos] + google_filename[pos:].lower()  # lowercase the extension
 
 
-def read_photo_list_file(service, photo_dir, download_filter_func):
+def read_photo_list_file(service, photo_dir, list_file, download_filter_func):
     """
 
     :param service:
@@ -242,12 +260,10 @@ def read_photo_list_file(service, photo_dir, download_filter_func):
     :param download_filter_func: function to filter outfile
     :return:
     """
-    list_file = os.path.join(photo_dir, 'photo_list.csv')
     if not os.path.exists(list_file):
         download_photo_list(service, list_file)
         sys.exit(0)
 
-    list_file = os.path.join(photo_dir, 'photo_list.csv')
     photo_list_df = pd.read_csv(list_file)
     logger.info('loaded list from %s: %s', list_file, photo_list_df.shape)
     logger.info('dataframe structure:\n%s', photo_list_df.dtypes)
@@ -283,17 +299,6 @@ def read_photo_list_file(service, photo_dir, download_filter_func):
     return photo_list_df
 
 
-def get_output_dir():
-    """
-
-    :return: output directory
-    """
-    photo_dir = os.path.join(os.environ['HOME'], 'Desktop/private/photos')  # Mac
-    if host.startswith('LINUX'):
-        photo_dir = os.path.join(os.environ['HOME'], 'TB/photos')
-    return photo_dir
-
-
 def parse_args():
     """
 
@@ -303,6 +308,9 @@ def parse_args():
     parser.add_argument('-s', '--sequential', action="store_true", help='sequential download')
     parser.add_argument('-t', '--token-only', action="store_true", help='get token only')
     parser.add_argument('-i', '--info-only', action="store_true", help='info only. no download')
+    parser.add_argument('<tocken file>', help="Google token file")
+    parser.add_argument('<photo directory', help="photo store location")
+    parser.add_argument('<photo list file>', help="Google photo's list file")
     args = parser.parse_args()
     logger.info('options: %s', args)
     return args
@@ -317,12 +325,22 @@ def main():
     signal(SIGINT, sigint_handler)
 
     args = parse_args()
-    photo_dir = get_output_dir()
-    service = init_service(photo_dir)
+    logger.info('%s', sys.argv)
+    token_file = sys.argv[1]
+    photo_dir = sys.argv[2]
+    photo_list_file = sys.argv[3]
+    logger.info('Token file: %s', token_file)
+    logger.info('Photo directory: %s', photo_dir)
+    logger.info('Phot list file: %s', photo_list_file)
+
+    service = init_service(token_file)
     if args.token_only:
         sys.exit(0)
+    exit(0)
 
-    photo_list_df = read_photo_list_file(service, photo_dir, filter_outfile)
+    photo_list_df = read_photo_list_file(service, photo_dir,
+                                         list_file=photo_list_file,
+                                         download_filter_func=filter_outfile)
     if photo_list_df.empty:
         logger.info('All photos were downloaded. Nothing more to download.')
         sys.exit(0)
