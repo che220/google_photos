@@ -56,7 +56,7 @@ def main():
     :return:
     """
     root_dir = os.path.join(os.environ['HOME'], 'TB/photos')
-    heic_files = sorted(glob.glob(os.path.join(root_dir, '[0-9][0-9][0-9][0-9]-[0-9][0-9]/*.heic')))
+    heic_files = sorted(glob.glob(os.path.join(root_dir, '[0-9][0-9][0-9][0-9]-[0-9][0-9]/[0-9][0-9]/*.heic')))
 
     total_files = len(heic_files)
     logger.info('total %s HEIC files', total_files)
