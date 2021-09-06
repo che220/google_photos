@@ -6,6 +6,7 @@ import logging
 import glob
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import traceback
+import shutil
 
 import pyheif
 from PIL import Image, UnidentifiedImageError
@@ -22,6 +23,15 @@ logging.basicConfig(format='%(asctime)s [%(name)s:%(lineno)d] [%(levelname)s] %(
 logger = logging.getLogger(os.path.basename(__file__))
 
 
+def archive_heic(heic_file):
+    file_dir = os.path.dirname(heic_file)
+    file_dir = os.path.join(file_dir, 'heic')
+    os.makedirs(file_dir, exist_ok=True)
+    new_path = os.path.join(file_dir, os.path.basename(heic_file))
+    shutil.move(heic_file, new_path)
+    logger.info('moved HEIC file: %s -> %s', heic_file, new_path)
+
+
 def convert_to_jpg(heic_file):
     """
 
@@ -35,6 +45,7 @@ def convert_to_jpg(heic_file):
             image = Image.open(heic_file)
             image.save(outfile)
             logger.info('converted: %s -> %s %s', heic_file, outfile, image.size)
+        archive_heic(heic_file)
         return outfile
     except UnidentifiedImageError:
         heif_file = pyheif.read(heic_file)
@@ -42,6 +53,7 @@ def convert_to_jpg(heic_file):
                                 heif_file.mode, heif_file.stride, )
         image.save(outfile)
         logger.info('HEIF converted: %s -> %s %s', heic_file, outfile, image.size)
+        archive_heic(heic_file)
         return outfile
     except:  # pylint: disable=bare-except
         traceback.print_exc()
